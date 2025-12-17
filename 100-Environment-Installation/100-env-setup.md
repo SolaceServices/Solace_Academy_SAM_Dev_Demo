@@ -1,0 +1,80 @@
+# This environment setup is used for each of the course directories
+
+## 1. Navigate to your course directory
+
+E.g.
+
+```
+cd 100-Environment-Installation
+```
+
+## 2. Install Environemnt Prequisites
+
+1. Install Python (3.10+)
+
+```
+brew install python
+python3 --version
+```
+
+## 2. Installing Solace Agent Mesh
+
+1. In the `sam` directory, create a virtual environment
+
+```
+cd sam
+python3 -m venv .venv
+```
+
+2. Activate the virtual environment
+
+```
+source .venv/bin/activate
+```
+
+3. Install the requirements
+
+```
+pip install -r requirements.txt
+playwright install
+```
+
+> Make sure you have activated your virtual environment before proceeding with the demo. Run `source .venv/bin/activate` if you haven't already done so. Anytime you open a new terminal, you will have to navigate to the `sam` dir and activate the python virtual environment
+
+5. Initialize the solace agent mesh
+
+```
+sam init
+```
+
+6. Open the configuration Portal in the broswer
+
+```
+Would you like to configure your project through a web interface in your browser? [Y/n]: y
+```
+
+7. In the GUI, select `Advanced Setup` ![VSCode](assets/Agent%20Mesh%20Init%20GUI.png)
+
+8. After initializing sam, you should now see a
+
+```
+.
+├── configs
+│ ├── agents
+│ │ └── main_orchestrator.yaml
+│ ├── gateways
+│ │ └── webui.yaml
+│ ├── logging_config.yaml
+│ └── shared_config.yaml
+├── requirements.txt
+└── src
+└── .env
+└── requirements.txt
+└── sam.log
+```
+
+9. Run Solace Agent Mesh
+
+```
+sam run
+```

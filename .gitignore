@@ -1,3 +1,4 @@
 # Ignore Env Variables
 .env
 .env.config
+*/sam/.env

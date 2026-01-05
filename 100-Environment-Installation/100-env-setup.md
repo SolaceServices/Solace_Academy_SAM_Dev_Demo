@@ -8,7 +8,7 @@ E.g.
 cd 100-Environment-Installation
 ```
 
-## 2. Install Environemnt Prequisites
+## 2. Install Environment Prequisites
 
 1. Install Python (3.10+)
 
@@ -53,7 +53,7 @@ sam init
 Would you like to configure your project through a web interface in your browser? [Y/n]: y
 ```
 
-7. In the GUI, select `Advanced Setup` ![VSCode](assets/Agent%20Mesh%20Init%20GUI.png)
+7. In the GUI, select `Advanced Setup` ![VSCode](../assets/Agent%20Mesh%20Init%20GUI.png) and configure the relevant fields
 
 8. After initializing sam, you should now see a
 

@@ -3,7 +3,7 @@
 ## 1. Want to skip doing it again? Run the setup.sh script
 
 ```
-cd ./400-Gateways
+cd ./800-Systems-Design
 source ./setup.sh
 ```
 

@@ -3,6 +3,7 @@
 ## 1. Want to skip doing it again? Run the setup.sh script
 
 ```
+cd ./500-Evals
 source ./setup.sh
 ```
 

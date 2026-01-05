@@ -35,3 +35,5 @@ fi
 
 echo "✅ Setup complete"
 set +e
+
+sam run

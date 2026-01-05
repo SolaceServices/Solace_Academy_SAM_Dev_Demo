@@ -3,6 +3,7 @@
 ## 1. Want to skip doing it again? Run the setup.sh script
 
 ```
+cd ./700-Troubleshooting
 source ./setup.sh
 ```
 

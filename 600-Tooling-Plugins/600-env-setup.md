@@ -4,7 +4,7 @@
 
 ```
 cd ./600-Tooling-Plugins
-source ./setup.sh
+source ./600-setup.sh
 ```
 
 ## 2. Opened a new terminal?

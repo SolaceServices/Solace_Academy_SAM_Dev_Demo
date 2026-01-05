@@ -4,7 +4,7 @@
 
 ```
 cd ./800-Systems-Design
-source ./setup.sh
+source ./800-setup.sh
 ```
 
 ## 2. Opened a new terminal?

@@ -4,7 +4,7 @@
 
 ```
 cd ./500-Evals
-source ./setup.sh
+source ./500-setup.sh
 ```
 
 ## 2. Opened a new terminal?

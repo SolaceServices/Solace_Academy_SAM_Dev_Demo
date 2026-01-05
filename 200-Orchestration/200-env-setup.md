@@ -4,7 +4,7 @@
 
 ```
 cd ./200-Orchestration
-source ./setup.sh
+source ./200-setup.sh
 ```
 
 ## 2. Opened a new terminal?

@@ -36,4 +36,5 @@ fi
 echo "✅ Setup complete"
 set +e
 
+echo "🏃 Running SAM"
 sam run

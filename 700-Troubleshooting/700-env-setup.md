@@ -4,7 +4,7 @@
 
 ```
 cd ./700-Troubleshooting
-source ./setup.sh
+source ./700-setup.sh
 ```
 
 ## 2. Opened a new terminal?

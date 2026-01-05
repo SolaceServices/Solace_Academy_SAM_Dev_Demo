@@ -4,7 +4,7 @@
 
 ```
 cd ./400-Gateways
-source ./setup.sh
+source ./400-setup.sh
 ```
 
 ## 2. Opened a new terminal?

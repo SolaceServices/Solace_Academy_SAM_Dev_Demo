@@ -22,7 +22,7 @@ sam init --skip
 
 # Sync with shared .env file
 SHARED_ENV="../../.env.config"
-SAM_ENV="$REPO_ROOT/sam/.env"
+SAM_ENV="$COURSE_ROOT/sam/.env"
 
 if [ -f "$SHARED_ENV" ]; then
   echo "🔁 Syncing root .env → sam/.env"

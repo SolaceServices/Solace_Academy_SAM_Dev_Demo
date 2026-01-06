@@ -12,6 +12,7 @@ source ./200-setup.sh
 Anytime you open a new terminal, you will have to navigate to the sam dir and activate the python virtual environment
 
 ```
+cd ./200-Orchestration/sam
 .venv/bin/activate
 sam run
 ```

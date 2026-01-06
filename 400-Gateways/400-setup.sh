@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COURSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "📂 Course root: $REPO_ROOT"
+echo "📂 Course root: $COURSE_ROOT"
 
-cd "$REPO_ROOT/sam"
+cd "$COURSE_ROOT/sam"
 
 echo "🔧 Creating virtual environment..."
 python3 -m venv .venv
@@ -30,8 +30,7 @@ if [ -f "$SHARED_ENV" ]; then
   echo "🔁 Syncing root .env → sam/.env"
   cp "$SHARED_ENV" "$SAM_ENV"
 else
-  echo "⚠️ Root .env not found, creating new sam/.env"
-  touch "$SAM_ENV"
+  echo "⚠️ Root .env not found"
 fi
 
 # Append VAR=VALUE if VAR isn't already defined in sam/.env

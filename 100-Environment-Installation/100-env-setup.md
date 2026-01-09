@@ -2,19 +2,8 @@
 
 ## 1. Navigate to your course directory
 
-E.g.
-
 ```
 cd 100-Environment-Installation
-```
-
-## 2. Install Environment Prequisites
-
-1. Install Python (3.10+)
-
-```
-brew install python
-python3 --version
 ```
 
 ## 2. Installing Solace Agent Mesh

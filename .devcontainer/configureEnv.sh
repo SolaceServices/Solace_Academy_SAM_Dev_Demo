@@ -63,7 +63,8 @@ npm --version
 
 # Run broker setup script
 echo "Setting up Solace broker..."
-bash ./setup-broker.sh
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+bash "$SCRIPT_DIR/setup-broker.sh"
 
 # End timer and calculate duration
 END_TIME=$(date +%s)

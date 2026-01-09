@@ -15,14 +15,14 @@ echo "deb [arch=amd64 trusted=yes] https://raw.githubusercontent.com/SolaceLabs/
 sudo apt-get update
 sudo apt-get install stm
 
-# Install Java 17
-sudo apt install -y openjdk-17-jdk
-echo "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> ~/.bashrc
-echo "export PATH=\$JAVA_HOME/bin:\$PATH" >> ~/.bashrc
-source ~/.bashrc
+# # Install Java 17
+# sudo apt install -y openjdk-17-jdk
+# echo "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> ~/.bashrc
+# echo "export PATH=\$JAVA_HOME/bin:\$PATH" >> ~/.bashrc
+# source ~/.bashrc
 
 # Install Maven
-sudo apt install maven -y
+# sudo apt install maven -y
 
 # Download and extract Python 3.12
 sudo apt update
@@ -32,20 +32,20 @@ sudo apt update
 sudo apt install -y python3.12 python3.12-venv
 
 # Install latest Go version
-echo "Installing latest Go version..."
-# Get the latest version
-LATEST_GO_VERSION=$(curl -s https://go.dev/VERSION?m=text | head -n 1)
-echo "Latest Go version: $LATEST_GO_VERSION"
-wget "https://go.dev/dl/${LATEST_GO_VERSION}.linux-amd64.tar.gz"
-sudo rm -rf /usr/local/go
-sudo tar -C /usr/local -xzf "${LATEST_GO_VERSION}.linux-amd64.tar.gz"
-rm "${LATEST_GO_VERSION}.linux-amd64.tar.gz"
-echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.bashrc
-echo "export GOPATH=\$HOME/go" >> ~/.bashrc
-echo "export PATH=\$PATH:\$GOPATH/bin" >> ~/.bashrc
-source ~/.bashrc
-echo "Go installation complete"
-go version
+# echo "Installing latest Go version..."
+# # Get the latest version
+# LATEST_GO_VERSION=$(curl -s https://go.dev/VERSION?m=text | head -n 1)
+# echo "Latest Go version: $LATEST_GO_VERSION"
+# wget "https://go.dev/dl/${LATEST_GO_VERSION}.linux-amd64.tar.gz"
+# sudo rm -rf /usr/local/go
+# sudo tar -C /usr/local -xzf "${LATEST_GO_VERSION}.linux-amd64.tar.gz"
+# rm "${LATEST_GO_VERSION}.linux-amd64.tar.gz"
+# echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.bashrc
+# echo "export GOPATH=\$HOME/go" >> ~/.bashrc
+# echo "export PATH=\$PATH:\$GOPATH/bin" >> ~/.bashrc
+# source ~/.bashrc
+# echo "Go installation complete"
+# go version
 
 # Install Node.js LTS
 echo "Installing Node.js LTS..."

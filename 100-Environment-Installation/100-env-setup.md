@@ -53,7 +53,9 @@ sam init
 Would you like to configure your project through a web interface in your browser? [Y/n]: y
 ```
 
-7. In the GUI, select `Advanced Setup` ![VSCode](../assets/Agent%20Mesh%20Init%20GUI.png) and configure the relevant fields
+7. In the GUI, select `Advanced Setup` and configure the relevant fields
+
+![VSCode](../assets/Agent%20Mesh%20Init%20GUI.png)
 
 8. After initializing sam, you should now see a
 

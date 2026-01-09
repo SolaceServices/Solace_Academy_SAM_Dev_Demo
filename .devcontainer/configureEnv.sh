@@ -63,7 +63,7 @@ npm --version
 
 # Run broker setup script
 echo "Setting up Solace broker..."
-bash ./setup_broker.sh
+bash ./setup-broker.sh
 
 # End timer and calculate duration
 END_TIME=$(date +%s)

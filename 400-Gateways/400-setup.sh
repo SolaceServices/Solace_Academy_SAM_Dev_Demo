@@ -80,26 +80,29 @@ else
   echo "⚠️ Shared .env.config not found at: $SHARED_ENV (skipping env sync)"
 fi
 
+# ----------------------------
 # Install Module Specific Agents
-echo "🤖 Installing Agents"
-sam plugin add customer-sql-agent --plugin sam-sql-database
+# ----------------------------
+if sam plugin list 2>/dev/null | grep -q '^customer-sql-agent\b'; then
+  echo "🤖 customer-sql-agent already installed (skipping)"
+else
+  sam plugin add customer-sql-agent --plugin sam-sql-database
+fi
 
-# Add header Comment
-if ! grep -q "# --- SQL Agent config for customer-sql-db ---" "$SAM_ENV"; then
+# Ensure SAM env contains SQL agent config
+if ! grep -qF "# --- SQL Agent config for customer-sql-db ---" "$SAM_ENV"; then
   {
     echo ""
     echo "# --- SQL Agent config for customer-sql-db ---"
   } >> "$SAM_ENV"
 fi
 
-# Only set if they DON'T already exist in .env.config
 ensure_env_var "CUSTOMER_SQL_AGENT_DB_TYPE" "sqlite"
 ensure_env_var "CUSTOMER_SQL_AGENT_DB_HOST" ""
 ensure_env_var "CUSTOMER_SQL_AGENT_DB_PORT" ""
 ensure_env_var "CUSTOMER_SQL_AGENT_DB_USER" ""
 ensure_env_var "CUSTOMER_SQL_AGENT_DB_PASSWORD" ""
 ensure_env_var "CUSTOMER_SQL_AGENT_DB_NAME" "customer_sql_agent.db"
-echo "✅ Setup complete"
 set +e
 
 # Load sam/.env into the current shell (so FASTAPI_PORT etc are available)

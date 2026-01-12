@@ -5,7 +5,7 @@ Once you have configured your `.env.config` file, use the command below to set u
 You can run this command again anytime to restart SAM.
 
 ```
-cd ./400-Orchestration
+cd ./400-Gateways
 source ./400-setup.sh
 ```
 

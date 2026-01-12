@@ -135,6 +135,7 @@ set +m
   until ui_is_up "$PORT"; do
     sleep 1
   done
+  echo ""
   echo "🌐 SAM UI: $UI_URL"
   echo ""
 ) &

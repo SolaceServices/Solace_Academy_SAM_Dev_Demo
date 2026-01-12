@@ -12,6 +12,7 @@ source ./400-setup.sh
 Anytime you open a new terminal, you will have to navigate to the sam dir and activate the python virtual environment
 
 ```
-.venv/bin/activate
+cd ./400-Gateways/sam
+source .venv/bin/activate
 sam run
 ```

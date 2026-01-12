@@ -6,7 +6,7 @@ You can run this command again anytime to restart SAM.
 
 ```
 cd ./200-Orchestration
-./200-setup.sh
+source ./200-setup.sh
 ```
 
 This single command will:

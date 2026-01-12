@@ -5,8 +5,8 @@ Once you have configured your `.env.config` file, use the command below to set u
 You can run this command again anytime to restart SAM.
 
 ```
-cd ./200-Orchestration
-./200-setup.sh
+cd ./400-Orchestration
+source ./300-setup.sh
 ```
 
 This single command will:

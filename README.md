@@ -1,4 +1,4 @@
-# Solace_Academy_SAM_Demo
+# Solace Academy SAM Demo
 
 ## Explain that each directory is an independent instance of SAM that is configured to pick up where the last course left off
 

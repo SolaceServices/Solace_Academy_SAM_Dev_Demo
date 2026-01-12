@@ -1,22 +1,27 @@
-# Already configured your environment?
+# 1. Starting and Restarting Solace Agent Mesh
 
-## 1. Want to skip doing it again? Run the setup.sh script
+Once you have configured your `.env.config` file, use the command below to set up and run Solace Agent Mesh in this codespace.
 
-```
-cd ./300-Agents
-source ./300-setup.sh
-```
-
-## 2. Opened a new terminal?
-
-Anytime you open a new terminal, you will have to navigate to the sam dir and activate the python virtual environment
+You can run this command again anytime to restart SAM.
 
 ```
-.venv/bin/activate
-sam run
+cd ./200-Orchestration
+./200-setup.sh
 ```
 
-## 3. Add Agents from the Catalog
+This single command will:
+
+- Create or re-activate the Python virtual environment
+
+- Apply your existing configurations
+
+- Start or restart Solace Agent Mesh
+
+- Print the clickable SAM Web UI link
+
+> Note: the xxx-setup.sh scripts were added to this codelab to simplify setup and configuration in the learning environment. In a real Solace Agent Mesh environment, setup and startup are performed manually rather than through a helper script.
+
+# 2. Add Agents from the Catalog
 
 You can add pre-built agents from our plugin catalog by killing the process and running
 
@@ -24,6 +29,6 @@ You can add pre-built agents from our plugin catalog by killing the process and 
 sam plugin catalog
 ```
 
-a. Select sam_sql_database_tool --> install
-b. name it "customer-sql-agent"
-c. Click "Install Plugin"
+- Select `sam_sql_database_tool` --> install
+- Name it `customer-sql-agent`
+- Click `Install Plugin`

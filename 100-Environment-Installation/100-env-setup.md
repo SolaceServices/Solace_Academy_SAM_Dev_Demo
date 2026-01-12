@@ -42,7 +42,20 @@ sam init
 Would you like to configure your project through a web interface in your browser? [Y/n]: y
 ```
 
-7. In the GUI, select `Advanced Setup` and configure the relevant fields
+7. In the GUI, select `Advanced Setup` and configure the relevant fields:
+
+- Project Namespace: `Solace-Academy-SAM-Demo`
+- Broker Type: `Existing Solace Pub/Sub+ broker`
+- Broker URL: `ws://localhost:8008`
+- VPN Name: `default`
+- Username: `admin`
+- Password: `admin`
+- LLM Provider: `Your LLM Provider`
+- LLM Endpoint URL: `Your LLM Endpoint URL`
+- LLM API Key: `Your LLM API Key`
+- LLM Model Name: `Your LLM Model Name`
+
+- Session Secret Key: `Create a strong session key`
 
 ![VSCode](../assets/Agent%20Mesh%20Init%20GUI.png)
 

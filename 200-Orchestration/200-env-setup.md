@@ -1,18 +1,22 @@
-# Already configured your environment?
+# 1. Starting and Restarting Solace Agent Mesh
 
-## 1. Want to skip doing it again? Run the setup.sh script
+Once you have configured your `.env.config` file, use the command below to set up and run Solace Agent Mesh in this codespace.
+
+You can run this command again anytime to restart SAM.
 
 ```
 cd ./200-Orchestration
-source ./200-setup.sh
+./200-setup.sh
 ```
 
-## 2. Opened a new terminal?
+This single command will:
 
-Anytime you open a new terminal, you will have to navigate to the sam dir and activate the python virtual environment
+- Create or re-activate the Python virtual environment
 
-```
-cd ./200-Orchestration/sam
-.venv/bin/activate
-sam run
-```
+- Apply your existing configurations
+
+- Start or restart Solace Agent Mesh
+
+- Print the clickable SAM Web UI link
+
+> Note: the xxx-setup.sh scripts were added to this codelab to simplify setup and configuration in the learning environment. In a real Solace Agent Mesh environment, setup and startup are performed manually rather than through a helper script.

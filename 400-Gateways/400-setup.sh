@@ -6,6 +6,7 @@ SAM_DIR="$COURSE_ROOT/sam"
 SHARED_ENV="$COURSE_ROOT/../.env.config"
 SAM_ENV="$SAM_DIR/.env"
 PORT_DEFAULT=8000
+AGENT_CFG="$SAM_DIR/configs/agents/customer-sql-agent.yaml"
 
 echo "📂 Course root: $COURSE_ROOT"
 cd "$SAM_DIR"
@@ -83,8 +84,10 @@ fi
 # ----------------------------
 # Install Module Specific Agents
 # ----------------------------
-if sam plugin list 2>/dev/null | grep -q '^customer-sql-agent\b'; then
-  echo "🤖 customer-sql-agent already installed (skipping)"
+echo "🤖 Installing Agents"
+
+if [ -f "$AGENT_CFG" ]; then
+  echo "✅ customer-sql-agent already configured (skipping)"
 else
   sam plugin add customer-sql-agent --plugin sam-sql-database
 fi

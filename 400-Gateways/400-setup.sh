@@ -87,7 +87,7 @@ fi
 echo "🤖 Installing Agents"
 
 if [ -f "$AGENT_CFG" ]; then
-  echo "✅ customer-sql-agent already configured (skipping)"
+  echo "    ✅ customer-sql-agent already configured (skipping)"
 else
   sam plugin add customer-sql-agent --plugin sam-sql-database
 fi

@@ -1,4 +1,4 @@
-# This environment setup is used for each of the course directories
+# Setting Up Solace Agent Mesh
 
 ## 1. Navigate to your course directory
 

@@ -3,7 +3,7 @@
 # Setup script for Solace broker in GitHub Codespaces
 # This script assumes Docker is properly configured via devcontainer features
 
-echo "Setting up Solace broker..."
+echo "🧩 Setting up Solace broker..."
 
 # Check if Docker is working
 echo "Checking if Docker is accessible..."

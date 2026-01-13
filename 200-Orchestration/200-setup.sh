@@ -89,7 +89,6 @@ for p in 8000 8001 8443; do
   fuser -k "${p}/tcp" >/dev/null 2>&1 || true
 done
 
-set +e
   # Verify Solace Broker container is running
   if docker ps | grep -q solace; then
     echo "🧩 Broker already running (skipping)."

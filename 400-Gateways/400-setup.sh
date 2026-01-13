@@ -14,7 +14,6 @@ cd "$SAM_DIR"
 # ----------------------------
 # Helpers
 # ----------------------------
-
 get_port() {
   echo "${FASTAPI_PORT:-$PORT_DEFAULT}"
 }
@@ -117,19 +116,25 @@ if [ -f "$SAM_ENV" ]; then
 fi
 
 # ----------------------------
-# Run SAM with “Loading UI → URL → SAM logs”
+# Running SAM
 # ----------------------------
 PORT="$(get_port)"
 UI_URL="$(build_ui_url "$PORT")"
 
-# Kill anything holding the ports (restart-friendly)
+# Restart-friendly: free common SAM ports (ignore errors)
 for p in 8000 8001 8443; do
   fuser -k "${p}/tcp" >/dev/null 2>&1 || true
 done
 
-echo "⏳ Loading UI..."
+  # Verify Solace Broker container is running
+  if docker ps | grep -q solace; then
+    echo "🧩 Broker already running (skipping)."
+  else
+    bash ../../.devcontainer/setup-broker.sh
+  fi
 
-# Print URL once the UI responds
+# Print URL once the UI is reachable
+echo "⏳ Loading UI..."
 set +m
 (
   until ui_is_up "$PORT"; do
@@ -138,7 +143,9 @@ set +m
   echo ""
   echo "🌐 SAM UI: $UI_URL"
   echo ""
+  exit 0
 ) &
 
+# Run SAM in the foreground so logs behave normally and it stays running
 echo "🏃 Running SAM..."
 sam run

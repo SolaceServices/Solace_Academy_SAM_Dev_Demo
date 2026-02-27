@@ -1,0 +1,110 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run Course Setup",
+      "type": "shell",
+      "command": "bash -c ${input:courseCommand}",
+      "options": {
+        "cwd": "/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/scripts"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Simulate Events",
+      "type": "shell",
+      "command": "bash ./simulate-events.sh ${input:eventScenario}",
+      "options": {
+        "cwd": "/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/scripts"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "Grade My Work",
+      "type": "shell",
+      "command": "bash ./grade.sh",
+      "options": {
+        "cwd": "/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/scripts"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "courseCommand",
+      "type": "pickString",
+      "description": "Which course do you want to set up?",
+      "options": [
+        {
+          "label": "200 - Orchestration",
+          "value": "'source ./200-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/200-Orchestration'"
+        },
+        {
+          "label": "300 - Agents",
+          "value": "'source ./300-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents'"
+        },
+        {
+          "label": "400 - Gateways",
+          "value": "'source ./400-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/400-Gateways'"
+        },
+        {
+          "label": "500 - Evals",
+          "value": "'source ./500-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/500-Evals'"
+        },
+        {
+          "label": "600 - Tooling & Plugins",
+          "value": "'source ./600-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/600-Tooling-Plugins'"
+        },
+        {
+          "label": "700 - Troubleshooting",
+          "value": "'source ./700-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/700-Troubleshooting'"
+        },
+        {
+          "label": "800 - System Design",
+          "value": "'source ./800-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/800-System-Design'"
+        }
+      ]
+    },
+    {
+      "id": "eventScenario",
+      "type": "pickString",
+      "description": "Which Acme Retail scenario do you want to simulate?",
+      "options": [
+        {
+          "label": "1️⃣ Low Stock Alert",
+          "value": "--scenario low-stock"
+        },
+        {
+          "label": "2️⃣ Order Fulfillment",
+          "value": "--scenario order-fulfillment"
+        },
+        {
+          "label": "3️⃣ Incident Response",
+          "value": "--scenario incident-response"
+        },
+        {
+          "label": "4️⃣ Knowledge Query",
+          "value": "--scenario knowledge-query"
+        },
+        {
+          "label": "5️⃣ Analytics Dashboard",
+          "value": "--scenario analytics-dashboard"
+        },
+        {
+          "label": "6️⃣ Full Retail Day",
+          "value": "--scenario full-day"
+        }
+      ]
+    }
+  ]
+}

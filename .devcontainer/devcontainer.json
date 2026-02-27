@@ -18,7 +18,8 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        "solace-tools.solace-try-me-vsc-extension"
+        "solace-tools.solace-try-me-vsc-extension",
+        "spencerwmiles.vscode-task-buttons"
       ],
        "settings": {
         "files.autoSave": "afterDelay",

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-COURSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COURSE_ROOT="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 SAM_DIR="$COURSE_ROOT/sam"
 SHARED_ENV="$COURSE_ROOT/../.env.config"
 SAM_ENV="$SAM_DIR/.env"

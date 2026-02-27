@@ -2,7 +2,7 @@
 
 ## 1. Navigate to your course directory
 
-```
+```sh
 cd 100-Environment-Installation
 ```
 
@@ -10,20 +10,20 @@ cd 100-Environment-Installation
 
 1. In the `sam` directory, create a virtual environment
 
-```
+```sh
 cd sam
 python3 -m venv .venv
 ```
 
 2. Activate the virtual environment
 
-```
+```sh
 source .venv/bin/activate
 ```
 
 3. Install the requirements
 
-```
+```sh
 pip install -r requirements.txt
 playwright install
 ```
@@ -32,7 +32,7 @@ playwright install
 
 5. Initialize the solace agent mesh
 
-```
+```sh
 sam init
 ```
 
@@ -79,6 +79,6 @@ Would you like to configure your project through a web interface in your browser
 
 9. Run Solace Agent Mesh
 
-```
+```sh
 sam run
 ```

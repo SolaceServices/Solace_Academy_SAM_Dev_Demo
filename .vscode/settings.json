@@ -2,5 +2,28 @@
   "markdown.preview.openMarkdownLinks": "inPreview",
   "files.autoSave": "afterDelay",
   "files.autoSaveDelay": 1000,
-  "markdown.preview.doubleClickToSwitchToEditor": false
+  "markdown.preview.doubleClickToSwitchToEditor": false,
+
+  // Task Buttons shown in the status bar at the bottom
+  "VsCodeTaskButtons.showCounter": false,
+  "VsCodeTaskButtons.tasks": [
+    {
+      "label": "$(play)Run Course Setup",
+      "color": "warning",
+      "task": "Run Course Setup",
+      "tooltip": "Automatically installs and configures Solace Agent Mesh for the selected course"
+    },
+    {
+      "label": "$(play)Simulate Events",
+      "color": "warning",
+      "task": "Simulate Events",
+      "tooltip": "Automatically runs the Solace-Try-Me tool to test your agent mesh with the selected event"
+    },
+    {
+      "label": "$(play)Grade My Work",
+      "color": "error",
+      "task": "Grade My Work",
+      "tooltip": "Automatically tests each agent and submits a score to Solace Academy"
+    }
+  ]
 }

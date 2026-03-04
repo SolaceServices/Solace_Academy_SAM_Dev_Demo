@@ -1,12 +1,16 @@
 {
-  "name": "Solace Developer Workshop",
+  "name": "Solace Academy SAM Dev Demo",
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "runArgs": [
+    "--ulimit",
+    "nofile=1048576:1048576"
+  ],
   "waitFor": "onCreateCommand",
   "postCreateCommand": "/bin/bash .devcontainer/configureEnv.sh",
   "hostRequirements": {
-   "cpus": 4,
-   "memory": "16gb",
-   "storage": "32gb"
+    "cpus": 4,
+    "memory": "16gb",
+    "storage": "32gb"
   },
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
@@ -21,7 +25,7 @@
         "solace-tools.solace-try-me-vsc-extension",
         "spencerwmiles.vscode-task-buttons"
       ],
-       "settings": {
+      "settings": {
         "files.autoSave": "afterDelay",
         "markdown.preview.openPreviewToSide": true,
         "workbench.editorAssociations": {

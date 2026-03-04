@@ -13,8 +13,6 @@ if ! docker info > /dev/null 2>&1; then
   exit 1
 fi
 
-echo "Docker is running and accessible!"
-
 # Check if Solace container is already running
 if docker ps | grep -q solace; then
   echo "Solace broker is already running!"
@@ -35,7 +33,6 @@ else
   fi
 
   # Verify Solace container is running
-  echo "Verifying Solace broker is running..."
   if docker ps | grep -q solace; then
     echo "Solace broker is running!"
   else

@@ -1,0 +1,5 @@
+[
+  {"sku": "WIDGET-001", "quantity": 15, "warehouse": "WH-EAST", "threshold": 10},
+  {"sku": "GADGET-202", "quantity": 3, "warehouse": "WH-WEST", "threshold": 10},
+  {"sku": "DOOHICKEY-99", "quantity": 45, "warehouse": "WH-EAST", "threshold": 20}
+]

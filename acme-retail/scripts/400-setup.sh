@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-COURSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COURSE_ROOT="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 SAM_DIR="$COURSE_ROOT/sam"
 SHARED_ENV="$COURSE_ROOT/../.env.config"
 SAM_ENV="$SAM_DIR/.env"
 PORT_DEFAULT=8000
+AGENT_CFG="$SAM_DIR/configs/agents/customer-sql-agent.yaml"
 
 echo "📂 Course root: $COURSE_ROOT"
 cd "$SAM_DIR"
@@ -29,6 +30,15 @@ build_ui_url() {
 ui_is_up() {
   local port="$1"
   curl -fsS "http://127.0.0.1:${port}/" >/dev/null 2>&1
+}
+
+ensure_env_var() {
+  local var_name="$1"
+  local default_value="$2"
+
+  if ! grep -qE "^[[:space:]]*${var_name}=" "$SAM_ENV"; then
+    echo "${var_name}=${default_value}" >> "$SAM_ENV"
+  fi
 }
 
 # ----------------------------
@@ -69,6 +79,33 @@ if [ -f "$SHARED_ENV" ]; then
 else
   echo "⚠️ Shared .env.config not found at: $SHARED_ENV (skipping env sync)"
 fi
+
+# ----------------------------
+# Install Module Specific Agents
+# ----------------------------
+echo "🤖 Installing Agents"
+
+if [ -f "$AGENT_CFG" ]; then
+  echo "    ✅ customer-sql-agent already configured (skipping)"
+else
+  sam plugin add customer-sql-agent --plugin sam-sql-database
+fi
+
+# Ensure SAM env contains SQL agent config
+if ! grep -qF "# --- SQL Agent config for customer-sql-db ---" "$SAM_ENV"; then
+  {
+    echo ""
+    echo "# --- SQL Agent config for customer-sql-db ---"
+  } >> "$SAM_ENV"
+fi
+
+ensure_env_var "CUSTOMER_SQL_AGENT_DB_TYPE" "sqlite"
+ensure_env_var "CUSTOMER_SQL_AGENT_DB_HOST" ""
+ensure_env_var "CUSTOMER_SQL_AGENT_DB_PORT" ""
+ensure_env_var "CUSTOMER_SQL_AGENT_DB_USER" ""
+ensure_env_var "CUSTOMER_SQL_AGENT_DB_PASSWORD" ""
+ensure_env_var "CUSTOMER_SQL_AGENT_DB_NAME" "customer_sql_agent.db"
+set +e
 
 # Load sam/.env into the current shell (so FASTAPI_PORT etc are available)
 if [ -f "$SAM_ENV" ]; then

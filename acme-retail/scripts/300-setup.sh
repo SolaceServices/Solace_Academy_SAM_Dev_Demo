@@ -96,6 +96,22 @@ done
     bash ../../.devcontainer/setup-broker.sh
   fi
 
+  # Start postgres container and seed db
+  docker compose up -d
+
+  # Wait for postgres to be healthy before attempting any queries
+  until docker exec 300-Agents-postgres pg_isready -U acme -d orders >/dev/null 2>&1; do
+    sleep 1
+  done
+
+  # Seed only if the orders table is empty or doesn't exist yet
+  if docker exec 300-Agents-postgres psql -U acme -d orders -t -c "SELECT 1 FROM orders LIMIT 1;" 2>/dev/null | grep -q 1; then
+    echo "🌱 Database already seeded (skipping)."
+  else
+    echo "🌱 Seeding database..."
+    python /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/scripts/seed_orders_db.py
+  fi
+
 # Print URL once the UI is reachable
 echo "⏳ Loading UI..."
 set +m

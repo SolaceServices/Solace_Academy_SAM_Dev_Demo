@@ -3,7 +3,6 @@
   "files.autoSave": "afterDelay",
   "files.autoSaveDelay": 1000,
   "markdown.preview.doubleClickToSwitchToEditor": false,
-
   // Task Buttons shown in the status bar at the bottom
   "VsCodeTaskButtons.showCounter": false,
   "VsCodeTaskButtons.tasks": [
@@ -17,7 +16,7 @@
       "label": "$(play)Simulate Events",
       "color": "warning",
       "task": "Simulate Events",
-      "tooltip": "Automatically runs the Solace-Try-Me tool to test your agent mesh with the selected event"
+      "tooltip": "Publish real events to test your agent mesh"
     },
     {
       "label": "$(play)Grade My Work",

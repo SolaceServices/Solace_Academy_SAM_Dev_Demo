@@ -31,6 +31,15 @@ ui_is_up() {
   curl -fsS "http://127.0.0.1:${port}/" >/dev/null 2>&1
 }
 
+agents_ready() {
+  local port="$1"
+  local cards
+  cards=$(curl -fsS "http://127.0.0.1:${port}/api/v1/agentCards" 2>/dev/null) || return 1
+  echo "$cards" | grep -q "OrchestratorAgent" || return 1
+  echo "$cards" | grep -q "AcmeKnowledge" || return 1
+  return 0
+}
+
 # ----------------------------
 # Setup (only if needed)
 # ----------------------------
@@ -89,6 +98,10 @@ for p in 8000 8001 8443; do
   fuser -k "${p}/tcp" >/dev/null 2>&1 || true
 done
 
+# Clear stale session databases to prevent history conflicts on restart
+echo "🧹 Clearing stale session databases..."
+rm -f orchestrator.db webui_gateway.db acme_knowledge.db platform.db
+
   # Verify Solace Broker container is running
   if docker ps | grep -q solace; then
     echo "🧩 Broker already running (skipping)."
@@ -112,12 +125,15 @@ done
     python /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/scripts/seed_orders_db.py
   fi
 
-# Print URL once the UI is reachable
-echo "⏳ Loading UI..."
+# Print URL once the UI is reachable and all agents have registered
+echo "⏳ Loading UI and waiting for agents..."
 set +m
 (
   until ui_is_up "$PORT"; do
     sleep 1
+  done
+  until agents_ready "$PORT"; do
+    sleep 2
   done
   echo ""
   echo "🌐 SAM UI: $UI_URL"

@@ -23,14 +23,26 @@
     "vscode": {
       "extensions": [
         "solace-tools.solace-try-me-vsc-extension",
-        "spencerwmiles.vscode-task-buttons"
+        "spencerwmiles.vscode-task-buttons",
+        "cweijan.vscode-postgresql-client2"
       ],
       "settings": {
         "files.autoSave": "afterDelay",
         "markdown.preview.openPreviewToSide": true,
         "workbench.editorAssociations": {
           "*.md": "vscode.markdown.preview.editor"
-        }
+        },
+        "database-client.connections": [
+          {
+            "name": "Orders DB",
+            "dbType": "PostgreSQL",
+            "host": "localhost",
+            "port": 5432,
+            "database": "orders",
+            "username": "acme",
+            "password": "acme"
+          }
+        ]
       }
     }
   }

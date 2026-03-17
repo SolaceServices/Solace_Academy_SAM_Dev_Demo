@@ -16,7 +16,7 @@
     {
       "label": "Simulate Events",
       "type": "shell",
-      "command": "bash ./simulate-events.sh ${input:eventScenario}",
+      "command": "bash ./run-scenario.sh ${input:eventScenario}",
       "options": {
         "cwd": "/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/scripts"
       },
@@ -27,7 +27,7 @@
       }
     },
     {
-      "label": "Grade My Work",
+      "label": "Submit My Work",
       "type": "shell",
       "command": "bash ./grade.sh",
       "options": {
@@ -86,7 +86,7 @@
         },
         {
           "label": "2️⃣ Order Fulfillment",
-          "value": "--scenario order-fulfillment"
+          "value": "--test-order-fulfillment"
         },
         {
           "label": "3️⃣ Incident Response",

@@ -1,0 +1,378 @@
+{
+  "orders": [
+    {
+      "order_id": "ORD-2026-001",
+      "customer_id": "CUST-1001",
+      "customer_name": "Sarah Mitchell",
+      "customer_email": "sarah.mitchell@email.com",
+      "order_date": "2026-03-08T10:30:00Z",
+      "status": "delivered",
+      "priority": "standard",
+      "total_amount": 299.97,
+      "currency": "USD",
+      "shipping_address": {
+        "street": "123 Main Street",
+        "city": "San Francisco",
+        "state": "CA",
+        "zip": "94102",
+        "country": "USA"
+      },
+      "items": [
+        {
+          "item_id": "SKU-LAPTOP-001",
+          "product_name": "UltraBook Pro 15",
+          "quantity": 1,
+          "unit_price": 199.99,
+          "total_price": 199.99
+        },
+        {
+          "item_id": "SKU-MOUSE-042",
+          "product_name": "Wireless Mouse Elite",
+          "quantity": 2,
+          "unit_price": 49.99,
+          "total_price": 99.98
+        }
+      ],
+      "shipment_id": "SHIP-2026-0045",
+      "tracking_number": "1Z999AA10123456784",
+      "delivery_date": "2026-03-10T14:22:00Z",
+      "notes": "Left at front door per customer request"
+    },
+    {
+      "order_id": "ORD-2026-002",
+      "customer_id": "CUST-1002",
+      "customer_name": "James Chen",
+      "customer_email": "james.chen@email.com",
+      "order_date": "2026-03-09T14:15:00Z",
+      "status": "processing",
+      "priority": "express",
+      "total_amount": 849.95,
+      "currency": "USD",
+      "shipping_address": {
+        "street": "456 Tech Boulevard",
+        "city": "Austin",
+        "state": "TX",
+        "zip": "78701",
+        "country": "USA"
+      },
+      "items": [
+        {
+          "item_id": "SKU-MONITOR-105",
+          "product_name": "4K Display Pro 27",
+          "quantity": 1,
+          "unit_price": 599.99,
+          "total_price": 599.99
+        },
+        {
+          "item_id": "SKU-KEYBOARD-088",
+          "product_name": "Mechanical Keyboard RGB",
+          "quantity": 1,
+          "unit_price": 149.99,
+          "total_price": 149.99
+        },
+        {
+          "item_id": "SKU-CABLE-201",
+          "product_name": "USB-C Cable 6ft",
+          "quantity": 2,
+          "unit_price": 49.99,
+          "total_price": 99.98
+        }
+      ],
+      "shipment_id": "SHIP-2026-0052",
+      "tracking_number": "1Z999AA10123456790",
+      "estimated_delivery": "2026-03-11T18:00:00Z",
+      "notes": "Express shipping - signature required"
+    },
+    {
+      "order_id": "ORD-2026-003",
+      "customer_id": "CUST-1003",
+      "customer_name": "Emily Rodriguez",
+      "customer_email": "emily.rodriguez@email.com",
+      "order_date": "2026-03-10T08:45:00Z",
+      "status": "pending",
+      "priority": "standard",
+      "total_amount": 1299.98,
+      "currency": "USD",
+      "shipping_address": {
+        "street": "789 Innovation Drive",
+        "city": "Seattle",
+        "state": "WA",
+        "zip": "98101",
+        "country": "USA"
+      },
+      "items": [
+        {
+          "item_id": "SKU-LAPTOP-002",
+          "product_name": "Gaming Laptop Xtreme",
+          "quantity": 1,
+          "unit_price": 1299.98,
+          "total_price": 1299.98
+        }
+      ],
+      "shipment_id": null,
+      "tracking_number": null,
+      "estimated_delivery": "2026-03-14T17:00:00Z",
+      "notes": "Awaiting inventory allocation"
+    },
+    {
+      "order_id": "ORD-2026-004",
+      "customer_id": "CUST-1004",
+      "customer_name": "Michael Thompson",
+      "customer_email": "michael.thompson@email.com",
+      "order_date": "2026-03-10T11:20:00Z",
+      "status": "blocked",
+      "priority": "standard",
+      "total_amount": 399.96,
+      "currency": "USD",
+      "shipping_address": {
+        "street": "321 Business Park",
+        "city": "Denver",
+        "state": "CO",
+        "zip": "80202",
+        "country": "USA"
+      },
+      "items": [
+        {
+          "item_id": "SKU-TABLET-055",
+          "product_name": "Pro Tablet 12",
+          "quantity": 3,
+          "unit_price": 399.99,
+          "total_price": 1199.97
+        }
+      ],
+      "shipment_id": null,
+      "tracking_number": null,
+      "estimated_delivery": null,
+      "notes": "Insufficient inventory - awaiting restock",
+      "incident_id": "INC-2026-015"
+    },
+    {
+      "order_id": "ORD-2026-005",
+      "customer_id": "CUST-1005",
+      "customer_name": "Lisa Wang",
+      "customer_email": "lisa.wang@email.com",
+      "order_date": "2026-03-09T16:30:00Z",
+      "status": "shipped",
+      "priority": "express",
+      "total_amount": 549.97,
+      "currency": "USD",
+      "shipping_address": {
+        "street": "555 Lake Shore Drive",
+        "city": "Chicago",
+        "state": "IL",
+        "zip": "60611",
+        "country": "USA"
+      },
+      "items": [
+        {
+          "item_id": "SKU-HEADSET-022",
+          "product_name": "Noise Cancelling Headset Pro",
+          "quantity": 1,
+          "unit_price": 299.99,
+          "total_price": 299.99
+        },
+        {
+          "item_id": "SKU-WEBCAM-033",
+          "product_name": "4K Webcam Ultra",
+          "quantity": 1,
+          "unit_price": 249.98,
+          "total_price": 249.98
+        }
+      ],
+      "shipment_id": "SHIP-2026-0048",
+      "tracking_number": "1Z999AA10123456791",
+      "estimated_delivery": "2026-03-11T12:00:00Z",
+      "notes": "In transit - expected tomorrow"
+    },
+    {
+      "order_id": "ORD-2026-006",
+      "customer_id": "CUST-1006",
+      "customer_name": "David Kumar",
+      "customer_email": "david.kumar@email.com",
+      "order_date": "2026-03-10T13:10:00Z",
+      "status": "cancelled",
+      "priority": "standard",
+      "total_amount": 799.99,
+      "currency": "USD",
+      "shipping_address": {
+        "street": "888 Market Street",
+        "city": "Boston",
+        "state": "MA",
+        "zip": "02101",
+        "country": "USA"
+      },
+      "items": [
+        {
+          "item_id": "SKU-PRINTER-066",
+          "product_name": "All-in-One Printer Pro",
+          "quantity": 1,
+          "unit_price": 799.99,
+          "total_price": 799.99
+        }
+      ],
+      "shipment_id": null,
+      "tracking_number": null,
+      "estimated_delivery": null,
+      "cancelled_date": "2026-03-10T15:45:00Z",
+      "cancellation_reason": "Customer requested cancellation",
+      "notes": "Refund processed"
+    },
+    {
+      "order_id": "ORD-2026-007",
+      "customer_id": "CUST-1007",
+      "customer_name": "Amanda Foster",
+      "customer_email": "amanda.foster@email.com",
+      "order_date": "2026-03-08T09:15:00Z",
+      "status": "delivered",
+      "priority": "standard",
+      "total_amount": 159.98,
+      "currency": "USD",
+      "shipping_address": {
+        "street": "222 Park Avenue",
+        "city": "New York",
+        "state": "NY",
+        "zip": "10001",
+        "country": "USA"
+      },
+      "items": [
+        {
+          "item_id": "SKU-MOUSE-042",
+          "product_name": "Wireless Mouse Elite",
+          "quantity": 2,
+          "unit_price": 49.99,
+          "total_price": 99.98
+        },
+        {
+          "item_id": "SKU-PAD-015",
+          "product_name": "Gaming Mouse Pad XL",
+          "quantity": 2,
+          "unit_price": 29.99,
+          "total_price": 59.98
+        }
+      ],
+      "shipment_id": "SHIP-2026-0041",
+      "tracking_number": "1Z999AA10123456777",
+      "delivery_date": "2026-03-09T16:30:00Z",
+      "notes": "Delivered successfully"
+    },
+    {
+      "order_id": "ORD-2026-008",
+      "customer_id": "CUST-1008",
+      "customer_name": "Robert Martinez",
+      "customer_email": "robert.martinez@email.com",
+      "order_date": "2026-03-10T15:30:00Z",
+      "status": "pending",
+      "priority": "express",
+      "total_amount": 2499.99,
+      "currency": "USD",
+      "shipping_address": {
+        "street": "999 Enterprise Way",
+        "city": "Los Angeles",
+        "state": "CA",
+        "zip": "90001",
+        "country": "USA"
+      },
+      "items": [
+        {
+          "item_id": "SKU-WORKSTATION-001",
+          "product_name": "Pro Workstation Tower",
+          "quantity": 1,
+          "unit_price": 2499.99,
+          "total_price": 2499.99
+        }
+      ],
+      "shipment_id": null,
+      "tracking_number": null,
+      "estimated_delivery": "2026-03-12T17:00:00Z",
+      "notes": "High-value order - requires special handling"
+    },
+    {
+      "order_id": "ORD-2026-009",
+      "customer_id": "CUST-1009",
+      "customer_name": "Jennifer Lee",
+      "customer_email": "jennifer.lee@email.com",
+      "order_date": "2026-03-10T10:00:00Z",
+      "status": "processing",
+      "priority": "standard",
+      "total_amount": 449.97,
+      "currency": "USD",
+      "shipping_address": {
+        "street": "444 Silicon Valley Blvd",
+        "city": "San Jose",
+        "state": "CA",
+        "zip": "95110",
+        "country": "USA"
+      },
+      "items": [
+        {
+          "item_id": "SKU-KEYBOARD-088",
+          "product_name": "Mechanical Keyboard RGB",
+          "quantity": 1,
+          "unit_price": 149.99,
+          "total_price": 149.99
+        },
+        {
+          "item_id": "SKU-MOUSE-042",
+          "product_name": "Wireless Mouse Elite",
+          "quantity": 1,
+          "unit_price": 49.99,
+          "total_price": 49.99
+        },
+        {
+          "item_id": "SKU-WEBCAM-033",
+          "product_name": "4K Webcam Ultra",
+          "quantity": 1,
+          "unit_price": 249.98,
+          "total_price": 249.98
+        }
+      ],
+      "shipment_id": "SHIP-2026-0053",
+      "tracking_number": "1Z999AA10123456792",
+      "estimated_delivery": "2026-03-13T17:00:00Z",
+      "notes": "Standard processing"
+    },
+    {
+      "order_id": "ORD-2026-010",
+      "customer_id": "CUST-1010",
+      "customer_name": "Christopher Brown",
+      "customer_email": "chris.brown@email.com",
+      "order_date": "2026-03-10T17:00:00Z",
+      "status": "pending",
+      "priority": "standard",
+      "total_amount": 99.99,
+      "currency": "USD",
+      "shipping_address": {
+        "street": "777 Sunset Boulevard",
+        "city": "Miami",
+        "state": "FL",
+        "zip": "33101",
+        "country": "USA"
+      },
+      "items": [
+        {
+          "item_id": "SKU-CABLE-201",
+          "product_name": "USB-C Cable 6ft",
+          "quantity": 2,
+          "unit_price": 49.99,
+          "total_price": 99.98
+        }
+      ],
+      "shipment_id": null,
+      "tracking_number": null,
+      "estimated_delivery": "2026-03-14T17:00:00Z",
+      "notes": "Awaiting warehouse processing"
+    }
+  ],
+  "metadata": {
+    "total_orders": 10,
+    "generated_date": "2026-03-10T18:49:00Z",
+    "statuses": {
+      "pending": 3,
+      "processing": 2,
+      "shipped": 1,
+      "delivered": 2,
+      "cancelled": 1,
+      "blocked": 1
+    }
+  }
+}

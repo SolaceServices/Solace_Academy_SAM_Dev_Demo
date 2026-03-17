@@ -1,0 +1,347 @@
+{
+  "incidents": [
+    {
+      "incident_id": "INC-2026-015",
+      "type": "inventory_shortage",
+      "severity": "high",
+      "status": "in_progress",
+      "title": "Pro Tablet 12 - Complete Stock Depletion",
+      "description": "SKU-TABLET-055 completely out of stock due to higher than expected demand. Affecting multiple pending orders.",
+      "created_date": "2026-03-09T12:00:00Z",
+      "last_updated": "2026-03-10T14:30:00Z",
+      "affected_items": [
+        {
+          "item_id": "SKU-TABLET-055",
+          "product_name": "Pro Tablet 12",
+          "quantity_short": 12
+        }
+      ],
+      "affected_orders": [
+        "ORD-2026-004"
+      ],
+      "root_cause": "Unexpected surge in demand from enterprise customers",
+      "impact": {
+        "orders_delayed": 1,
+        "revenue_at_risk": 1199.97,
+        "customer_satisfaction_risk": "high"
+      },
+      "resolution_plan": {
+        "actions": [
+          "Emergency reorder placed with supplier",
+          "Customer notification sent",
+          "Expedited shipping arranged for incoming stock"
+        ],
+        "expected_resolution_date": "2026-03-15T00:00:00Z",
+        "responsible_team": "Supply Chain Management"
+      },
+      "supplier_id": "SUP-001",
+      "events": [
+        {
+          "timestamp": "2026-03-09T12:00:00Z",
+          "event_type": "incident_created",
+          "description": "Incident automatically created when stock reached zero",
+          "user": "system"
+        },
+        {
+          "timestamp": "2026-03-09T14:30:00Z",
+          "event_type": "supplier_contacted",
+          "description": "Emergency reorder placed for 50 units",
+          "user": "supply_chain_team"
+        },
+        {
+          "timestamp": "2026-03-10T09:00:00Z",
+          "event_type": "customer_notified",
+          "description": "Affected customer contacted with delay notification",
+          "user": "customer_service"
+        },
+        {
+          "timestamp": "2026-03-10T14:30:00Z",
+          "event_type": "status_update",
+          "description": "Supplier confirmed shipment - ETA March 15",
+          "user": "supply_chain_team"
+        }
+      ]
+    },
+    {
+      "incident_id": "INC-2026-012",
+      "type": "shipment_delay",
+      "severity": "medium",
+      "status": "resolved",
+      "title": "Weather Delay - Midwest Shipments",
+      "description": "Severe winter storm causing delays in Chicago distribution hub. Multiple shipments affected.",
+      "created_date": "2026-03-07T08:00:00Z",
+      "last_updated": "2026-03-09T16:00:00Z",
+      "resolved_date": "2026-03-09T16:00:00Z",
+      "affected_items": [],
+      "affected_orders": [],
+      "affected_shipments": [
+        "SHIP-2026-0038",
+        "SHIP-2026-0039",
+        "SHIP-2026-0040"
+      ],
+      "root_cause": "Severe winter weather in Chicago region",
+      "impact": {
+        "shipments_delayed": 3,
+        "average_delay_hours": 36,
+        "customer_satisfaction_risk": "medium"
+      },
+      "resolution_plan": {
+        "actions": [
+          "Rerouted shipments through alternate facilities",
+          "Proactive customer communication",
+          "Expedited delivery once weather cleared"
+        ],
+        "expected_resolution_date": "2026-03-09T00:00:00Z",
+        "responsible_team": "Logistics Operations"
+      },
+      "events": [
+        {
+          "timestamp": "2026-03-07T08:00:00Z",
+          "event_type": "incident_created",
+          "description": "Weather alert triggered incident creation",
+          "user": "system"
+        },
+        {
+          "timestamp": "2026-03-07T10:30:00Z",
+          "event_type": "customers_notified",
+          "description": "All affected customers notified of potential delays",
+          "user": "logistics_team"
+        },
+        {
+          "timestamp": "2026-03-08T14:00:00Z",
+          "event_type": "alternate_routing",
+          "description": "Shipments rerouted through Indianapolis hub",
+          "user": "logistics_team"
+        },
+        {
+          "timestamp": "2026-03-09T16:00:00Z",
+          "event_type": "incident_resolved",
+          "description": "All shipments delivered successfully",
+          "user": "logistics_team"
+        }
+      ]
+    },
+    {
+      "incident_id": "INC-2026-018",
+      "type": "quality_issue",
+      "severity": "low",
+      "status": "investigating",
+      "title": "USB-C Cable Packaging Defect",
+      "description": "Minor packaging defect reported for SKU-CABLE-201. Does not affect product functionality.",
+      "created_date": "2026-03-10T11:00:00Z",
+      "last_updated": "2026-03-10T15:00:00Z",
+      "affected_items": [
+        {
+          "item_id": "SKU-CABLE-201",
+          "product_name": "USB-C Cable 6ft",
+          "quantity_affected": 150
+        }
+      ],
+      "affected_orders": [],
+      "root_cause": "Under investigation - suspected supplier packaging line issue",
+      "impact": {
+        "customer_complaints": 2,
+        "return_rate_increase": "0.5%",
+        "customer_satisfaction_risk": "low"
+      },
+      "resolution_plan": {
+        "actions": [
+          "Contacted supplier for investigation",
+          "Inspecting current inventory",
+          "Monitoring customer feedback"
+        ],
+        "expected_resolution_date": "2026-03-12T00:00:00Z",
+        "responsible_team": "Quality Assurance"
+      },
+      "supplier_id": "SUP-007",
+      "events": [
+        {
+          "timestamp": "2026-03-10T11:00:00Z",
+          "event_type": "incident_created",
+          "description": "Created from customer complaint pattern",
+          "user": "quality_team"
+        },
+        {
+          "timestamp": "2026-03-10T13:00:00Z",
+          "event_type": "supplier_contacted",
+          "description": "Supplier investigating production batch #2026-C-042",
+          "user": "quality_team"
+        },
+        {
+          "timestamp": "2026-03-10T15:00:00Z",
+          "event_type": "inspection_started",
+          "description": "Warehouse team inspecting current stock",
+          "user": "warehouse_manager"
+        }
+      ]
+    },
+    {
+      "incident_id": "INC-2026-010",
+      "type": "system_outage",
+      "severity": "critical",
+      "status": "resolved",
+      "title": "Inventory Management System Outage",
+      "description": "Temporary outage of inventory management system causing order processing delays.",
+      "created_date": "2026-03-06T14:30:00Z",
+      "last_updated": "2026-03-06T18:45:00Z",
+      "resolved_date": "2026-03-06T18:45:00Z",
+      "affected_items": [],
+      "affected_orders": [
+        "ORD-2026-0050",
+        "ORD-2026-0051",
+        "ORD-2026-0052",
+        "ORD-2026-0053",
+        "ORD-2026-0054"
+      ],
+      "root_cause": "Database connection pool exhaustion during peak traffic",
+      "impact": {
+        "orders_delayed": 5,
+        "downtime_minutes": 255,
+        "revenue_impact": 3247.85,
+        "customer_satisfaction_risk": "high"
+      },
+      "resolution_plan": {
+        "actions": [
+          "Increased database connection pool size",
+          "Implemented circuit breaker pattern",
+          "Added monitoring alerts for connection pool metrics",
+          "Processed backlog of delayed orders"
+        ],
+        "expected_resolution_date": "2026-03-06T18:00:00Z",
+        "responsible_team": "Engineering Operations"
+      },
+      "events": [
+        {
+          "timestamp": "2026-03-06T14:30:00Z",
+          "event_type": "incident_created",
+          "description": "System monitoring detected service degradation",
+          "user": "monitoring_system"
+        },
+        {
+          "timestamp": "2026-03-06T14:35:00Z",
+          "event_type": "escalation",
+          "description": "P1 incident - on-call engineer paged",
+          "user": "system"
+        },
+        {
+          "timestamp": "2026-03-06T15:00:00Z",
+          "event_type": "root_cause_identified",
+          "description": "Database connection pool exhaustion confirmed",
+          "user": "engineering_team"
+        },
+        {
+          "timestamp": "2026-03-06T16:30:00Z",
+          "event_type": "fix_deployed",
+          "description": "Configuration update deployed to production",
+          "user": "engineering_team"
+        },
+        {
+          "timestamp": "2026-03-06T18:00:00Z",
+          "event_type": "service_restored",
+          "description": "All systems operational - monitoring for stability",
+          "user": "engineering_team"
+        },
+        {
+          "timestamp": "2026-03-06T18:45:00Z",
+          "event_type": "incident_resolved",
+          "description": "System stable - backlog processed",
+          "user": "engineering_team"
+        }
+      ]
+    },
+    {
+      "incident_id": "INC-2026-020",
+      "type": "supplier_delay",
+      "severity": "medium",
+      "status": "monitoring",
+      "title": "Gaming Laptop Restock Delay",
+      "description": "Supplier experiencing production delays for SKU-LAPTOP-002. May impact upcoming orders.",
+      "created_date": "2026-03-10T16:00:00Z",
+      "last_updated": "2026-03-10T17:30:00Z",
+      "affected_items": [
+        {
+          "item_id": "SKU-LAPTOP-002",
+          "product_name": "Gaming Laptop Xtreme",
+          "expected_delay_days": 7
+        }
+      ],
+      "affected_orders": [],
+      "root_cause": "Component shortage at supplier manufacturing facility",
+      "impact": {
+        "projected_stockout_date": "2026-03-13T00:00:00Z",
+        "orders_at_risk": 8,
+        "revenue_at_risk": 10399.84,
+        "customer_satisfaction_risk": "medium"
+      },
+      "resolution_plan": {
+        "actions": [
+          "Working with supplier on expedited component sourcing",
+          "Evaluating alternate suppliers",
+          "Prepared customer communication templates",
+          "Monitoring daily stock levels"
+        ],
+        "expected_resolution_date": "2026-03-17T00:00:00Z",
+        "responsible_team": "Procurement"
+      },
+      "supplier_id": "SUP-001",
+      "events": [
+        {
+          "timestamp": "2026-03-10T16:00:00Z",
+          "event_type": "incident_created",
+          "description": "Supplier proactively notified us of delay",
+          "user": "procurement_team"
+        },
+        {
+          "timestamp": "2026-03-10T17:30:00Z",
+          "event_type": "mitigation_planned",
+          "description": "Alternate supplier contact initiated",
+          "user": "procurement_team"
+        }
+      ]
+    }
+  ],
+  "incident_categories": [
+    {
+      "type": "inventory_shortage",
+      "description": "Stock level critically low or depleted",
+      "default_severity": "high",
+      "auto_create_threshold": "stock_zero"
+    },
+    {
+      "type": "shipment_delay",
+      "description": "Logistics or delivery delays",
+      "default_severity": "medium",
+      "auto_create_threshold": "24_hours_overdue"
+    },
+    {
+      "type": "quality_issue",
+      "description": "Product quality or defect concerns",
+      "default_severity": "low",
+      "auto_create_threshold": "3_complaints_same_sku"
+    },
+    {
+      "type": "system_outage",
+      "description": "Technology system failures",
+      "default_severity": "critical",
+      "auto_create_threshold": "service_unavailable"
+    },
+    {
+      "type": "supplier_delay",
+      "description": "Supplier production or delivery delays",
+      "default_severity": "medium",
+      "auto_create_threshold": "supplier_notification"
+    }
+  ],
+  "metadata": {
+    "total_incidents": 5,
+    "active_incidents": 3,
+    "resolved_incidents": 2,
+    "generated_date": "2026-03-10T18:49:00Z",
+    "severity_breakdown": {
+      "critical": 1,
+      "high": 1,
+      "medium": 2,
+      "low": 1
+    }
+  }
+}

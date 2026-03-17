@@ -1,0 +1,356 @@
+{
+    "shipments": [
+        {
+            "shipment_id": "SHIP-2026-0041",
+            "order_id": "ORD-2026-007",
+            "carrier": "FastShip Express",
+            "tracking_number": "1Z999AA10123456777",
+            "service_level": "ground",
+            "status": "delivered",
+            "origin": {
+                "facility": "WH-C",
+                "city": "Chicago",
+                "state": "IL",
+                "zip": "60601"
+            },
+            "destination": {
+                "street": "222 Park Avenue",
+                "city": "New York",
+                "state": "NY",
+                "zip": "10001"
+            },
+            "weight_lbs": 3.5,
+            "dimensions": {
+                "length_in": 12,
+                "width_in": 10,
+                "height_in": 4
+            },
+            "ship_date": "2026-03-08T14:00:00Z",
+            "estimated_delivery": "2026-03-09T17:00:00Z",
+            "actual_delivery": "2026-03-09T16:30:00Z",
+            "cost": 12.5,
+            "events": [
+                {
+                    "timestamp": "2026-03-08T14:00:00Z",
+                    "location": "Chicago, IL",
+                    "status": "picked_up",
+                    "description": "Package picked up from warehouse"
+                },
+                {
+                    "timestamp": "2026-03-08T18:30:00Z",
+                    "location": "Chicago Distribution Center, IL",
+                    "status": "in_transit",
+                    "description": "Departed carrier facility"
+                },
+                {
+                    "timestamp": "2026-03-09T08:15:00Z",
+                    "location": "New York Distribution Center, NY",
+                    "status": "arrived_at_facility",
+                    "description": "Arrived at destination facility"
+                },
+                {
+                    "timestamp": "2026-03-09T10:00:00Z",
+                    "location": "New York, NY",
+                    "status": "out_for_delivery",
+                    "description": "Out for delivery"
+                },
+                {
+                    "timestamp": "2026-03-09T16:30:00Z",
+                    "location": "New York, NY",
+                    "status": "delivered",
+                    "description": "Delivered successfully - signed by recipient"
+                }
+            ]
+        },
+        {
+            "shipment_id": "SHIP-2026-0045",
+            "order_id": "ORD-2026-001",
+            "carrier": "QuickDelivery Logistics",
+            "tracking_number": "1Z999AA10123456784",
+            "service_level": "ground",
+            "status": "delivered",
+            "origin": {
+                "facility": "WH-A",
+                "city": "San Francisco",
+                "state": "CA",
+                "zip": "94102"
+            },
+            "destination": {
+                "street": "123 Main Street",
+                "city": "San Francisco",
+                "state": "CA",
+                "zip": "94102"
+            },
+            "weight_lbs": 8.2,
+            "dimensions": {
+                "length_in": 18,
+                "width_in": 14,
+                "height_in": 6
+            },
+            "ship_date": "2026-03-09T10:00:00Z",
+            "estimated_delivery": "2026-03-10T17:00:00Z",
+            "actual_delivery": "2026-03-10T14:22:00Z",
+            "cost": 8.75,
+            "events": [
+                {
+                    "timestamp": "2026-03-09T10:00:00Z",
+                    "location": "San Francisco, CA",
+                    "status": "picked_up",
+                    "description": "Package picked up from warehouse"
+                },
+                {
+                    "timestamp": "2026-03-09T14:30:00Z",
+                    "location": "San Francisco Distribution Center, CA",
+                    "status": "in_transit",
+                    "description": "Processing at sort facility"
+                },
+                {
+                    "timestamp": "2026-03-10T08:00:00Z",
+                    "location": "San Francisco, CA",
+                    "status": "out_for_delivery",
+                    "description": "Out for delivery"
+                },
+                {
+                    "timestamp": "2026-03-10T14:22:00Z",
+                    "location": "San Francisco, CA",
+                    "status": "delivered",
+                    "description": "Left at front door per customer request"
+                }
+            ]
+        },
+        {
+            "shipment_id": "SHIP-2026-0048",
+            "order_id": "ORD-2026-005",
+            "carrier": "ExpressAir Priority",
+            "tracking_number": "1Z999AA10123456791",
+            "service_level": "express",
+            "status": "in_transit",
+            "origin": {
+                "facility": "WH-D",
+                "city": "Seattle",
+                "state": "WA",
+                "zip": "98101"
+            },
+            "destination": {
+                "street": "555 Lake Shore Drive",
+                "city": "Chicago",
+                "state": "IL",
+                "zip": "60611"
+            },
+            "weight_lbs": 5.8,
+            "dimensions": {
+                "length_in": 16,
+                "width_in": 12,
+                "height_in": 8
+            },
+            "ship_date": "2026-03-09T20:00:00Z",
+            "estimated_delivery": "2026-03-11T12:00:00Z",
+            "actual_delivery": null,
+            "cost": 35.99,
+            "events": [
+                {
+                    "timestamp": "2026-03-09T20:00:00Z",
+                    "location": "Seattle, WA",
+                    "status": "picked_up",
+                    "description": "Package picked up - express service"
+                },
+                {
+                    "timestamp": "2026-03-09T22:30:00Z",
+                    "location": "Seattle Air Hub, WA",
+                    "status": "departed_facility",
+                    "description": "Departed air hub"
+                },
+                {
+                    "timestamp": "2026-03-10T06:15:00Z",
+                    "location": "Chicago Air Hub, IL",
+                    "status": "arrived_at_facility",
+                    "description": "Arrived at destination air hub"
+                },
+                {
+                    "timestamp": "2026-03-10T09:00:00Z",
+                    "location": "Chicago Distribution Center, IL",
+                    "status": "in_transit",
+                    "description": "In transit to local facility"
+                }
+            ]
+        },
+        {
+            "shipment_id": "SHIP-2026-0052",
+            "order_id": "ORD-2026-002",
+            "carrier": "ExpressAir Priority",
+            "tracking_number": "1Z999AA10123456790",
+            "service_level": "express",
+            "status": "processing",
+            "origin": {
+                "facility": "WH-B",
+                "city": "Austin",
+                "state": "TX",
+                "zip": "78701"
+            },
+            "destination": {
+                "street": "456 Tech Boulevard",
+                "city": "Austin",
+                "state": "TX",
+                "zip": "78701"
+            },
+            "weight_lbs": 25.4,
+            "dimensions": {
+                "length_in": 32,
+                "width_in": 24,
+                "height_in": 12
+            },
+            "ship_date": "2026-03-10T15:00:00Z",
+            "estimated_delivery": "2026-03-11T18:00:00Z",
+            "actual_delivery": null,
+            "cost": 42.5,
+            "events": [
+                {
+                    "timestamp": "2026-03-10T15:00:00Z",
+                    "location": "Austin, TX",
+                    "status": "label_created",
+                    "description": "Shipping label created - awaiting pickup"
+                },
+                {
+                    "timestamp": "2026-03-10T17:30:00Z",
+                    "location": "Austin, TX",
+                    "status": "picked_up",
+                    "description": "Package picked up from warehouse"
+                }
+            ]
+        },
+        {
+            "shipment_id": "SHIP-2026-0053",
+            "order_id": "ORD-2026-009",
+            "carrier": "FastShip Express",
+            "tracking_number": "1Z999AA10123456792",
+            "service_level": "ground",
+            "status": "processing",
+            "origin": {
+                "facility": "WH-C",
+                "city": "Chicago",
+                "state": "IL",
+                "zip": "60601"
+            },
+            "destination": {
+                "street": "444 Silicon Valley Blvd",
+                "city": "San Jose",
+                "state": "CA",
+                "zip": "95110"
+            },
+            "weight_lbs": 7.6,
+            "dimensions": {
+                "length_in": 20,
+                "width_in": 15,
+                "height_in": 8
+            },
+            "ship_date": "2026-03-10T16:00:00Z",
+            "estimated_delivery": "2026-03-13T17:00:00Z",
+            "actual_delivery": null,
+            "cost": 18.25,
+            "events": [
+                {
+                    "timestamp": "2026-03-10T16:00:00Z",
+                    "location": "Chicago, IL",
+                    "status": "label_created",
+                    "description": "Shipping label created"
+                }
+            ]
+        }
+    ],
+    "carriers": [
+        {
+            "carrier_id": "CARR-001",
+            "name": "FastShip Express",
+            "service_levels": [
+                {
+                    "level": "ground",
+                    "delivery_days": "3-5",
+                    "rate_per_lb": 0.75
+                },
+                {
+                    "level": "2day",
+                    "delivery_days": "2",
+                    "rate_per_lb": 2.5
+                }
+            ],
+            "api_endpoint": "https://api.fastship.com/v2/tracking",
+            "active": true
+        },
+        {
+            "carrier_id": "CARR-002",
+            "name": "QuickDelivery Logistics",
+            "service_levels": [
+                {
+                    "level": "ground",
+                    "delivery_days": "2-4",
+                    "rate_per_lb": 0.85
+                },
+                {
+                    "level": "overnight",
+                    "delivery_days": "1",
+                    "rate_per_lb": 4
+                }
+            ],
+            "api_endpoint": "https://api.quickdelivery.com/track",
+            "active": true
+        },
+        {
+            "carrier_id": "CARR-003",
+            "name": "ExpressAir Priority",
+            "service_levels": [
+                {
+                    "level": "express",
+                    "delivery_days": "1-2",
+                    "rate_per_lb": 3.5
+                },
+                {
+                    "level": "overnight",
+                    "delivery_days": "1",
+                    "rate_per_lb": 5
+                }
+            ],
+            "api_endpoint": "https://api.expressair.com/v1/shipments",
+            "active": true
+        }
+    ],
+    "routes": [
+        {
+            "route_id": "ROUTE-001",
+            "origin": "San Francisco, CA",
+            "destination": "Los Angeles, CA",
+            "typical_transit_days": 1,
+            "distance_miles": 382,
+            "primary_carrier": "QuickDelivery Logistics"
+        },
+        {
+            "route_id": "ROUTE-002",
+            "origin": "Chicago, IL",
+            "destination": "New York, NY",
+            "typical_transit_days": 2,
+            "distance_miles": 790,
+            "primary_carrier": "FastShip Express"
+        },
+        {
+            "route_id": "ROUTE-003",
+            "origin": "Seattle, WA",
+            "destination": "Chicago, IL",
+            "typical_transit_days": 3,
+            "distance_miles": 2013,
+            "primary_carrier": "ExpressAir Priority"
+        },
+        {
+            "route_id": "ROUTE-004",
+            "origin": "Austin, TX",
+            "destination": "Denver, CO",
+            "typical_transit_days": 2,
+            "distance_miles": 900,
+            "primary_carrier": "FastShip Express"
+        }
+    ],
+    "metadata": {
+        "total_shipments": 5,
+        "active_shipments": 3,
+        "delivered_shipments": 2,
+        "generated_date": "2026-03-10T18:49:00Z"
+    }
+}

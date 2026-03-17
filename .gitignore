@@ -2,3 +2,6 @@
 .env
 .env.config
 */sam/.env
+
+# AI assistant context file
+CLAUDE.md

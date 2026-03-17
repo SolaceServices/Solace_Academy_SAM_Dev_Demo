@@ -19,9 +19,9 @@
       "tooltip": "Publish real events to test your agent mesh"
     },
     {
-      "label": "$(play)Grade My Work",
+      "label": "$(play)Submit My Work",
       "color": "error",
-      "task": "Grade My Work",
+      "task": "Submit My Work",
       "tooltip": "Automatically tests each agent and submits a score to Solace Academy"
     }
   ]

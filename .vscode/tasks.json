@@ -27,7 +27,7 @@
       }
     },
     {
-      "label": "Grade My Work",
+      "label": "Submit My Work",
       "type": "shell",
       "command": "bash ./grade.sh",
       "options": {

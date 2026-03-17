@@ -188,6 +188,11 @@ class BrokerClient:
                 except json.JSONDecodeError:
                     parsed = {"_raw": raw}
 
+                # json.loads can return str/int/list for valid JSON scalars —
+                # we need a dict so we can attach _topic below.
+                if not isinstance(parsed, dict):
+                    parsed = {"_raw": raw}
+
                 # Attach the actual topic so tests can inspect it
                 parsed["_topic"] = inbound.get_destination_name()
 

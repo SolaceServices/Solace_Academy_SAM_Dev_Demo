@@ -205,6 +205,33 @@ def assert_incident_exists(
         )
 
 
+def set_inventory_quantity(
+    item_id: str,
+    stock_quantity: int,
+    available_quantity: int,
+    status: str = "in_stock",
+    dsn: Optional[str] = None,
+):
+    """
+    Directly update inventory quantities for an item.
+
+    Used in test setup to simulate an inventory system updating the DB
+    before publishing a restock event, so the agent sees consistent data
+    from both the event payload and the database.
+    """
+    with db_cursor(dsn) as cur:
+        cur.execute(
+            """
+            UPDATE inventory
+               SET stock_quantity      = %s,
+                   available_quantity  = %s,
+                   status              = %s
+             WHERE item_id = %s
+            """,
+            (stock_quantity, available_quantity, status, item_id),
+        )
+
+
 def assert_field_equals(
     table: str,
     pk_column: str,

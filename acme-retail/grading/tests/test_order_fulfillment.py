@@ -1,11 +1,12 @@
 """
 test_order_fulfillment.py — Grading tests for the OrderFulfillmentAgent.
 
-Tests four event-driven scenarios:
-  1. New order with in-stock item     → fulfillment-result/validated
-  2. New order with out-of-stock item → fulfillment-result/blocked
-  3. Inventory restocked              → blocked order becomes validated
-  4. Shipment delayed                 → incident published on broker
+Tests five event-driven scenarios covering the agent's primary responsibilities:
+  1. New order with in-stock item     → agent responds with "validated" + order saved to DB
+  2. New order with out-of-stock item → agent responds with "blocked" + order saved to DB
+  3. Inventory restocked              → blocked order status updated to "validated" in DB
+  4. Shipment delayed                 → incident created + order estimated_delivery updated in DB
+  5. Order cancelled                  → order status set to "cancelled" in DB
 
 Run directly:
   cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/grading
@@ -14,6 +15,7 @@ Run directly:
 
 import sys
 import os
+import json
 import time
 import threading
 import queue
@@ -22,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from framework.broker import BrokerClient
 from framework.result import ResultCollector
-from framework.database import assert_order_status, assert_incident_exists, assert_field_equals
+from framework.database import assert_order_status, assert_field_equals, row_count
 from framework.seeder import full_reset
 
 
@@ -43,32 +45,28 @@ OOS_SKU        = "SKU-TABLET-055"
 OOS_NAME       = "Pro Tablet 12"
 OOS_PRICE      = 399.99
 
-BLOCKED_ORDER_ID        = "ORD-2026-004"
-DELAYED_SHIPMENT_ID     = "SHIP-2026-0048"
-DELAYED_TRACKING_NUMBER = "1Z999AA10123456791"
-DELAYED_ORDER_ID        = "ORD-2026-005"
+BLOCKED_ORDER_ID            = "ORD-2026-004"
+DELAYED_SHIPMENT_ID         = "SHIP-2026-0048"
+DELAYED_TRACKING_NUMBER     = "1Z999AA10123456791"
+DELAYED_ORDER_ID            = "ORD-2026-005"
+DELAYED_NEW_DELIVERY        = "2026-03-12T18:00:00Z"
+CANCEL_ORDER_ID             = "ORD-2026-003"
 
 TOPIC_ORDER_CREATED     = "acme/orders/created"
 TOPIC_INVENTORY_UPDATED = "acme/inventory/updated"
 TOPIC_SHIPMENT_DELAYED  = "acme/logistics/shipment-delayed"
-TOPIC_RESULT_WILDCARD   = "acme/orders/fulfillment-result/>"
+TOPIC_ORDER_CANCELLED   = "acme/orders/cancelled"
+TOPIC_ORDER_RESULT      = "acme/orders/decision"
 TOPIC_INCIDENT_CREATED  = "acme/incidents/created"
 
 AGENT_TIMEOUT_S = 25
-SUB_WARMUP_S    = 0.3   # seconds after subscribe before publishing (localhost sub propagates fast)
+SUB_WARMUP_S    = 0.3
 
 
 # ---------------------------------------------------------------------------
 # Spinner
 # ---------------------------------------------------------------------------
 class Spinner:
-    """
-    Prints a rotating spinner + elapsed time on a single line while waiting.
-
-    Usage:
-        with Spinner("  ⏳ Waiting for agent"):
-            msg = _run_scenario(...)
-    """
     FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
     def __init__(self, label: str):
@@ -94,7 +92,7 @@ class Spinner:
     def __exit__(self, *_):
         self._stop.set()
         self._thread.join()
-        print("\r" + " " * 60 + "\r", end="", flush=True)  # clear the spinner line
+        print("\r" + " " * 60 + "\r", end="", flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -116,6 +114,15 @@ def _new_order_payload(order_id, sku, name, price):
     }
 
 
+def _text(msg: dict) -> str:
+    """Return the message content as a lowercase string for keyword checks."""
+    if not msg:
+        return ""
+    if "_raw" in msg:
+        return msg["_raw"].lower()
+    return json.dumps(msg).lower()
+
+
 def _run_scenario(
     sub_topic,
     pub_topic,
@@ -124,14 +131,6 @@ def _run_scenario(
     timeout_s=AGENT_TIMEOUT_S,
     warmup_s=SUB_WARMUP_S,
 ):
-    """
-    1. Start a subscriber thread (signals ready via threading.Event once connected)
-    2. Sleep warmup_s (0.3s) to let the subscription propagate to the broker
-    3. Publish the event on a separate short-lived connection
-    4. Wait for the subscriber to receive a matching message
-    5. Return the message dict, or None on timeout
-    Any exception in the subscriber is re-raised in the caller.
-    """
     result_q = queue.Queue()
     error_q  = queue.Queue()
     ready    = threading.Event()
@@ -153,7 +152,7 @@ def _run_scenario(
     if not error_q.empty():
         raise error_q.get()
 
-    time.sleep(warmup_s)  # let subscription propagate before publishing
+    time.sleep(warmup_s)
 
     with BrokerClient() as pub:
         pub.publish(pub_topic, pub_payload)
@@ -172,7 +171,6 @@ def _run_scenario(
 def run_tests(student_email="student@example.com"):
     results = ResultCollector(suite_name="OrderFulfillmentAgent")
 
-    # ── Banner ────────────────────────────────────────────────────────────────
     W = 62
     print()
     print(_s("═" * W, "1", "36"))
@@ -180,7 +178,6 @@ def run_tests(student_email="student@example.com"):
     print(_s("  Publishes events to the broker and checks agent responses.", "2"))
     print(_s("═" * W, "1", "36"))
 
-    # ── DB reset ──────────────────────────────────────────────────────────────
     print(f"\n  🔄  Resetting database to seed state...")
     try:
         full_reset()
@@ -190,87 +187,88 @@ def run_tests(student_email="student@example.com"):
         results.record("db_reset", passed=False, message=str(exc))
         return results
 
-    # ── Test 1 — In-stock order → validated ───────────────────────────────────
+    # ── Test 1 — In-stock order → agent responds with "validated" ─────────────
     print(_s(f"\n  ── Test 1 ─{'─' * (W - 12)}", "2"))
-    print(_s("  New order (in stock)  →  fulfillment-result/validated", "1"))
+    print(_s("  New order (in stock)  →  agent responds on acme/orders/decision", "1"))
     print(_s(f"  Published to:  {TOPIC_ORDER_CREATED}", "2"))
-    print(_s(f"  Listening on:  {TOPIC_RESULT_WILDCARD}", "2"))
+    print(_s(f"  Listening on:  {TOPIC_ORDER_RESULT}", "2"))
     order_id_1 = "ORD-GRADE-VALID-001"
     msg1 = None
     results.section(f"Test 1 — New order for {IN_STOCK_SKU} ({IN_STOCK_NAME}, in stock)")
     try:
         with Spinner("Waiting for agent response"):
             msg1 = _run_scenario(
-                sub_topic=TOPIC_RESULT_WILDCARD,
+                sub_topic=TOPIC_ORDER_RESULT,
                 pub_topic=TOPIC_ORDER_CREATED,
                 pub_payload=_new_order_payload(order_id_1, IN_STOCK_SKU, IN_STOCK_NAME, IN_STOCK_PRICE),
-                predicate=lambda m: m.get("order_id") == order_id_1,
             )
     except Exception as exc:
-        results.record("t1_validated_message_received", False, str(exc),
-                       label="Response received on fulfillment-result/> within 25s")
+        results.record("t1_response_received", False, str(exc),
+                       label="Listening on acme/orders/decision — message received within 25s")
 
-    with results.test("t1_validated_message_received",
-                      label="Response received on fulfillment-result/> within 25s"):
-        assert msg1 is not None, f"No message on {TOPIC_RESULT_WILDCARD} within {AGENT_TIMEOUT_S}s"
+    with results.test("t1_response_received",
+                      label="Listening on acme/orders/decision — message received within 25s"):
+        assert msg1 is not None, f"No message on {TOPIC_ORDER_RESULT} within {AGENT_TIMEOUT_S}s"
     with results.test("t1_decision_is_validated",
-                      label='Response JSON contains decision = "validated"'):
+                      label='Response indicates order is validated (inventory sufficient)'):
         assert msg1 is not None, "No message (prerequisite failed)"
-        assert msg1.get("decision") == "validated", f"Got decision={msg1.get('decision')!r}"
-    with results.test("t1_order_id_echoed",
-                      label=f"Response JSON echoes order_id = {order_id_1!r}"):
-        assert msg1 is not None, "No message (prerequisite failed)"
-        assert msg1.get("order_id") == order_id_1, f"Got order_id={msg1.get('order_id')!r}"
-    with results.test("t1_topic_is_validated",
-                      label="Response published to topic ending in /validated"):
-        assert msg1 is not None, "No message (prerequisite failed)"
-        assert msg1.get("_topic", "").endswith("/validated"), f"Got topic={msg1.get('_topic')!r}"
+        assert "validated" in _text(msg1) or "valid" in _text(msg1), \
+            f"Response does not indicate validation: {_text(msg1)[:200]}"
+    with results.test("t1_order_saved_in_db",
+                      label=f"Order {order_id_1} saved to database with status 'validated'"):
+        try:
+            assert_order_status(order_id_1, "validated")
+        except Exception as exc:
+            assert False, str(exc)
 
-    # ── Test 2 — Out-of-stock order → blocked ─────────────────────────────────
+    # ── Test 2 — Out-of-stock order → agent responds with "blocked" ───────────
     print(_s(f"\n  ── Test 2 ─{'─' * (W - 12)}", "2"))
-    print(_s("  New order (out of stock)  →  fulfillment-result/blocked", "1"))
+    print(_s("  New order (out of stock)  →  agent responds with blocked decision", "1"))
     print(_s(f"  Published to:  {TOPIC_ORDER_CREATED}", "2"))
-    print(_s(f"  Listening on:  {TOPIC_RESULT_WILDCARD}", "2"))
+    print(_s(f"  Listening on:  {TOPIC_ORDER_RESULT}", "2"))
     order_id_2 = "ORD-GRADE-BLOCKED-001"
     msg2 = None
     results.section(f"Test 2 — New order for {OOS_SKU} ({OOS_NAME}, out of stock)")
     try:
         with Spinner("Waiting for agent response"):
             msg2 = _run_scenario(
-                sub_topic=TOPIC_RESULT_WILDCARD,
+                sub_topic=TOPIC_ORDER_RESULT,
                 pub_topic=TOPIC_ORDER_CREATED,
                 pub_payload=_new_order_payload(order_id_2, OOS_SKU, OOS_NAME, OOS_PRICE),
-                predicate=lambda m: m.get("order_id") == order_id_2,
             )
     except Exception as exc:
-        results.record("t2_blocked_message_received", False, str(exc),
-                       label="Response received on fulfillment-result/> within 25s")
+        results.record("t2_response_received", False, str(exc),
+                       label="Listening on acme/orders/decision — message received within 25s")
 
-    with results.test("t2_blocked_message_received",
-                      label="Response received on fulfillment-result/> within 25s"):
-        assert msg2 is not None, f"No message on {TOPIC_RESULT_WILDCARD} within {AGENT_TIMEOUT_S}s"
+    with results.test("t2_response_received",
+                      label="Listening on acme/orders/decision — message received within 25s"):
+        assert msg2 is not None, f"No message on {TOPIC_ORDER_RESULT} within {AGENT_TIMEOUT_S}s"
     with results.test("t2_decision_is_blocked",
-                      label='Response JSON contains decision = "blocked"'):
+                      label='Response indicates order is blocked (insufficient inventory)'):
         assert msg2 is not None, "No message (prerequisite failed)"
-        assert msg2.get("decision") == "blocked", f"Got decision={msg2.get('decision')!r}"
-    with results.test("t2_topic_is_blocked",
-                      label="Response published to topic ending in /blocked"):
-        assert msg2 is not None, "No message (prerequisite failed)"
-        assert msg2.get("_topic", "").endswith("/blocked"), f"Got topic={msg2.get('_topic')!r}"
+        assert ("blocked" in _text(msg2) or "out of stock" in _text(msg2)
+                or "insufficient" in _text(msg2) or "cannot" in _text(msg2)), \
+            f"Response does not indicate blocked: {_text(msg2)[:200]}"
+    with results.test("t2_order_saved_in_db",
+                      label=f"Order {order_id_2} saved to database with status 'blocked'"):
+        try:
+            assert_order_status(order_id_2, "blocked")
+        except Exception as exc:
+            assert False, str(exc)
 
-    # ── Test 3 — Inventory restock → re-validate blocked order ────────────────
+    # ── Test 3 — Inventory restock → re-validate blocked order in DB ──────────
     print(_s(f"\n  ── Test 3 ─{'─' * (W - 12)}", "2"))
-    print(_s("  Inventory restocked  →  blocked order re-validated", "1"))
+    print(_s("  Inventory restocked  →  blocked order updated to validated in DB", "1"))
     print(_s(f"  Published to:  {TOPIC_INVENTORY_UPDATED}", "2"))
-    print(_s(f"  Listening on:  {TOPIC_RESULT_WILDCARD}", "2"))
+    print(_s(f"  Listening on:  {TOPIC_ORDER_RESULT}", "2"))
     msg3 = None
     results.section(
-        f"Test 3 — Inventory restocked for {OOS_SKU} (qty +30) → re-validate blocked order {BLOCKED_ORDER_ID}"
+        f"Test 3 — Inventory restocked for {OOS_SKU} (qty +30) → re-validate {BLOCKED_ORDER_ID}"
     )
     try:
         with Spinner("Waiting for agent response"):
             msg3 = _run_scenario(
-                sub_topic=TOPIC_RESULT_WILDCARD,
+                sub_topic=TOPIC_ORDER_RESULT,
                 pub_topic=TOPIC_INVENTORY_UPDATED,
                 pub_payload={
                     "item_id": OOS_SKU,
@@ -279,28 +277,30 @@ def run_tests(student_email="student@example.com"):
                     "new_stock_quantity": 30,
                     "new_status": "in_stock",
                 },
-                predicate=lambda m: m.get("order_id") == BLOCKED_ORDER_ID,
             )
     except Exception as exc:
-        results.record("t3_restock_triggers_revalidation", False, str(exc),
-                       label=f"Re-validation response for {BLOCKED_ORDER_ID} received within 25s")
+        results.record("t3_response_received", False, str(exc),
+                       label="Listening on acme/orders/decision — message received within 25s")
 
-    with results.test("t3_restock_triggers_revalidation",
-                      label=f"Re-validation response for {BLOCKED_ORDER_ID} received within 25s"):
-        assert msg3 is not None, f"No fulfillment-result for {BLOCKED_ORDER_ID} within {AGENT_TIMEOUT_S}s"
-    with results.test("t3_blocked_order_now_validated",
-                      label='Response JSON contains decision = "validated"'):
-        assert msg3 is not None, "No message (prerequisite failed)"
-        assert msg3.get("decision") == "validated", f"Got decision={msg3.get('decision')!r}"
+    with results.test("t3_response_received",
+                      label="Listening on acme/orders/decision — message received within 25s"):
+        assert msg3 is not None, f"No message on {TOPIC_ORDER_RESULT} within {AGENT_TIMEOUT_S}s"
+    with results.test("t3_blocked_order_validated_in_db",
+                      label=f"Order {BLOCKED_ORDER_ID} status updated to 'validated' in database"):
+        try:
+            assert_order_status(BLOCKED_ORDER_ID, "validated")
+        except Exception as exc:
+            assert False, str(exc)
 
-    # ── Test 4 — Shipment delay → incident published ───────────────────────────
+    # ── Test 4 — Shipment delay → incident created + order delivery updated ────
     print(_s(f"\n  ── Test 4 ─{'─' * (W - 12)}", "2"))
-    print(_s("  Shipment delayed (+30h)  →  incident created", "1"))
+    print(_s("  Shipment delayed (+30h)  →  incident created + order delivery updated", "1"))
     print(_s(f"  Published to:  {TOPIC_SHIPMENT_DELAYED}", "2"))
     print(_s(f"  Listening on:  {TOPIC_INCIDENT_CREATED}", "2"))
     msg4 = None
+    incident_count_before = row_count("incidents", "type = %s", ("shipment_delay",))
     results.section(
-        f"Test 4 — Shipment {DELAYED_SHIPMENT_ID} delayed +30h → incident on acme/incidents/created"
+        f"Test 4 — Shipment {DELAYED_SHIPMENT_ID} delayed +30h → incident + order update"
     )
     try:
         with Spinner("Waiting for agent response"):
@@ -314,25 +314,65 @@ def run_tests(student_email="student@example.com"):
                     "carrier": "ExpressAir Priority",
                     "reason": "Severe weather — Chicago O'Hare hub",
                     "original_estimated_delivery": "2026-03-11T12:00:00Z",
-                    "new_estimated_delivery": "2026-03-12T18:00:00Z",
+                    "new_estimated_delivery": DELAYED_NEW_DELIVERY,
                     "delay_hours": 30,
                 },
-                predicate=lambda m: (
-                    m.get("tracking_number") == DELAYED_TRACKING_NUMBER
-                    or m.get("shipment_id") == DELAYED_SHIPMENT_ID
-                ),
             )
     except Exception as exc:
-        results.record("t4_incident_message_published", False, str(exc),
-                       label="Incident message received on acme/incidents/created within 25s")
+        results.record("t4_response_received", False, str(exc),
+                       label="Listening on acme/incidents/created — message received within 25s")
 
-    with results.test("t4_incident_message_published",
-                      label="Incident message received on acme/incidents/created within 25s"):
+    with results.test("t4_response_received",
+                      label="Listening on acme/incidents/created — message received within 25s"):
         assert msg4 is not None, f"No message on {TOPIC_INCIDENT_CREATED} within {AGENT_TIMEOUT_S}s"
-    with results.test("t4_incident_has_incident_id",
-                      label="Response JSON contains a non-empty incident_id"):
-        assert msg4 is not None, "No message (prerequisite failed)"
-        assert "incident_id" in msg4 and msg4["incident_id"], f"Missing incident_id: {msg4}"
+    with results.test("t4_incident_created_in_db",
+                      label="New shipment_delay incident row created in incidents table"):
+        incident_count_after = row_count("incidents", "type = %s", ("shipment_delay",))
+        assert incident_count_after > incident_count_before, (
+            f"No new shipment_delay incident found in DB "
+            f"(before={incident_count_before}, after={incident_count_after})"
+        )
+    with results.test("t4_order_delivery_updated",
+                      label=f"Order {DELAYED_ORDER_ID} estimated_delivery updated in database"):
+        try:
+            assert_field_equals(
+                "orders", "order_id", DELAYED_ORDER_ID,
+                "estimated_delivery", DELAYED_NEW_DELIVERY,
+            )
+        except Exception as exc:
+            assert False, str(exc)
+
+    # ── Test 5 — Order cancelled → order status set to 'cancelled' in DB ──────
+    print(_s(f"\n  ── Test 5 ─{'─' * (W - 12)}", "2"))
+    print(_s("  Order cancelled  →  order status set to cancelled in DB", "1"))
+    print(_s(f"  Published to:  {TOPIC_ORDER_CANCELLED}", "2"))
+    print(_s(f"  Listening on:  {TOPIC_ORDER_RESULT}", "2"))
+    msg5 = None
+    results.section(f"Test 5 — Order {CANCEL_ORDER_ID} cancelled → status 'cancelled' in DB")
+    try:
+        with Spinner("Waiting for agent response"):
+            msg5 = _run_scenario(
+                sub_topic=TOPIC_ORDER_RESULT,
+                pub_topic=TOPIC_ORDER_CANCELLED,
+                pub_payload={
+                    "order_id": CANCEL_ORDER_ID,
+                    "reason": "Customer requested cancellation",
+                    "cancelled_by": "customer",
+                },
+            )
+    except Exception as exc:
+        results.record("t5_response_received", False, str(exc),
+                       label="Listening on acme/orders/decision — message received within 25s")
+
+    with results.test("t5_response_received",
+                      label="Listening on acme/orders/decision — message received within 25s"):
+        assert msg5 is not None, f"No message on {TOPIC_ORDER_RESULT} within {AGENT_TIMEOUT_S}s"
+    with results.test("t5_order_cancelled_in_db",
+                      label=f"Order {CANCEL_ORDER_ID} status set to 'cancelled' in database"):
+        try:
+            assert_order_status(CANCEL_ORDER_ID, "cancelled")
+        except Exception as exc:
+            assert False, str(exc)
 
     # ── Summary ───────────────────────────────────────────────────────────────
     print("\n" + results.summary())

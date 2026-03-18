@@ -57,7 +57,7 @@ Would you like to configure your project through a web interface in your browser
 
 - Session Secret Key: `Create a strong session key`
 
-![VSCode](../assets/Agent%20Mesh%20Init%20GUI.png)
+![VSCode](../acme-retail/assets/Agent%20Mesh%20Init%20GUI.png)
 
 8. After initializing sam, you should now see a
 

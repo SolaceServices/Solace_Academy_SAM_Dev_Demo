@@ -130,6 +130,7 @@ class BrokerClient:
         topic_expression: str,
         timeout_s: float = 15.0,
         predicate=None,
+        on_ready=None,
     ) -> Optional[dict]:
         """
         Subscribe to *topic_expression* and block until a matching message
@@ -159,6 +160,8 @@ class BrokerClient:
             .build()
         )
         receiver.start()
+        if on_ready:
+            on_ready()
 
         deadline = time.monotonic() + timeout_s
         result = None

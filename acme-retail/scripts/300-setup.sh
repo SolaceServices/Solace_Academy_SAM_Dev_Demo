@@ -63,7 +63,11 @@ fi
 
 if [ ! -d ".sam" ] && [ ! -f "sam.yaml" ] && [ ! -f "sam.yml" ]; then
   echo "🚀 Initializing SAM..."
+  # sam init overwrites requirements.txt — preserve ours first
+  cp requirements.txt requirements.txt.bak
   sam init --skip
+  cp requirements.txt.bak requirements.txt
+  rm requirements.txt.bak
 else
   echo "🚀 SAM already initialized (skipping)."
 fi

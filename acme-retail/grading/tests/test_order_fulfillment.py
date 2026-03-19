@@ -59,8 +59,8 @@ TOPIC_ORDER_CANCELLED   = "acme/orders/cancelled"
 TOPIC_ORDER_RESULT      = "acme/orders/decision"
 TOPIC_INCIDENT_CREATED  = "acme/incidents/created"
 
-AGENT_TIMEOUT_S = 25
-SUB_WARMUP_S    = 0.3
+AGENT_TIMEOUT_S  = 25
+POST_MSG_SLEEP_S = 2   # let agent finish DB write before asserting
 
 
 # ---------------------------------------------------------------------------
@@ -129,7 +129,6 @@ def _run_scenario(
     pub_payload,
     predicate=None,
     timeout_s=AGENT_TIMEOUT_S,
-    warmup_s=SUB_WARMUP_S,
 ):
     result_q = queue.Queue()
     error_q  = queue.Queue()
@@ -138,8 +137,10 @@ def _run_scenario(
     def _subscriber():
         try:
             with BrokerClient() as sub:
-                ready.set()
-                msg = sub.wait_for_message(sub_topic, timeout_s=timeout_s, predicate=predicate)
+                msg = sub.wait_for_message(
+                    sub_topic, timeout_s=timeout_s, predicate=predicate,
+                    on_ready=ready.set,
+                )
                 result_q.put(msg)
         except Exception as exc:
             error_q.put(exc)
@@ -152,12 +153,10 @@ def _run_scenario(
     if not error_q.empty():
         raise error_q.get()
 
-    time.sleep(warmup_s)
-
     with BrokerClient() as pub:
         pub.publish(pub_topic, pub_payload)
 
-    t.join(timeout=timeout_s + warmup_s + 5)
+    t.join(timeout=timeout_s + 5)
 
     if not error_q.empty():
         raise error_q.get()
@@ -214,6 +213,7 @@ def run_tests(student_email="student@example.com"):
         assert msg1 is not None, "No message (prerequisite failed)"
         assert "validated" in _text(msg1) or "valid" in _text(msg1), \
             f"Response does not indicate validation: {_text(msg1)[:200]}"
+    time.sleep(POST_MSG_SLEEP_S)
     with results.test("t1_order_saved_in_db",
                       label=f"Order {order_id_1} saved to database with status 'validated'"):
         try:
@@ -249,6 +249,7 @@ def run_tests(student_email="student@example.com"):
         assert ("blocked" in _text(msg2) or "out of stock" in _text(msg2)
                 or "insufficient" in _text(msg2) or "cannot" in _text(msg2)), \
             f"Response does not indicate blocked: {_text(msg2)[:200]}"
+    time.sleep(POST_MSG_SLEEP_S)
     with results.test("t2_order_saved_in_db",
                       label=f"Order {order_id_2} saved to database with status 'blocked'"):
         try:
@@ -285,6 +286,7 @@ def run_tests(student_email="student@example.com"):
     with results.test("t3_response_received",
                       label="Listening on acme/orders/decision — message received within 25s"):
         assert msg3 is not None, f"No message on {TOPIC_ORDER_RESULT} within {AGENT_TIMEOUT_S}s"
+    time.sleep(POST_MSG_SLEEP_S)
     with results.test("t3_blocked_order_validated_in_db",
                       label=f"Order {BLOCKED_ORDER_ID} status updated to 'validated' in database"):
         try:
@@ -325,6 +327,7 @@ def run_tests(student_email="student@example.com"):
     with results.test("t4_response_received",
                       label="Listening on acme/incidents/created — message received within 25s"):
         assert msg4 is not None, f"No message on {TOPIC_INCIDENT_CREATED} within {AGENT_TIMEOUT_S}s"
+    time.sleep(POST_MSG_SLEEP_S)
     with results.test("t4_incident_created_in_db",
                       label="New shipment_delay incident row created in incidents table"):
         incident_count_after = row_count("incidents", "type = %s", ("shipment_delay",))
@@ -367,6 +370,7 @@ def run_tests(student_email="student@example.com"):
     with results.test("t5_response_received",
                       label="Listening on acme/orders/decision — message received within 25s"):
         assert msg5 is not None, f"No message on {TOPIC_ORDER_RESULT} within {AGENT_TIMEOUT_S}s"
+    time.sleep(POST_MSG_SLEEP_S)
     with results.test("t5_order_cancelled_in_db",
                       label=f"Order {CANCEL_ORDER_ID} status set to 'cancelled' in database"):
         try:

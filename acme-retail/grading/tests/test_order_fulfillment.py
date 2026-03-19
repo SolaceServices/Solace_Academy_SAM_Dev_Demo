@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from framework.broker import BrokerClient
 from framework.result import ResultCollector
-from framework.database import assert_order_status, assert_field_equals, row_count
+from framework.database import assert_order_status, assert_field_equals, row_count, set_inventory_quantity
 from framework.seeder import full_reset
 
 
@@ -266,6 +266,7 @@ def run_tests(student_email="student@example.com"):
     results.section(
         f"Test 3 — Inventory restocked for {OOS_SKU} (qty +30) → re-validate {BLOCKED_ORDER_ID}"
     )
+    set_inventory_quantity(OOS_SKU, stock_quantity=30, available_quantity=30, status="in_stock")
     try:
         with Spinner("Waiting for agent response"):
             msg3 = _run_scenario(

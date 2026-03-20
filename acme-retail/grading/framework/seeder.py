@@ -111,21 +111,29 @@ def reset_extra_rows(dsn: str = None):
         conn.close()
 
 
-def _delete_agent_session_dbs(sam_dir: str = None):
+def _clear_agent_session_dbs(sam_dir: str = None):
     """
-    Delete the OrderFulfillmentAgent's SQLite session DB(s) so the next
-    SAM restart starts with no stale session history.
+    Truncate all tables in the OrderFulfillmentAgent's SQLite session DB,
+    resetting it to the same empty state it was in when first created.
 
-    Safe to call while SAM is running — on Linux the file is unlinked from
-    the filesystem immediately, but the running process retains its open file
-    handle until it restarts.  The clean slate takes effect on the next
-    `sam run`.
+    Keeps the file and schema intact so the running SAM process is not
+    disrupted — only the session history is wiped.
     """
+    import sqlite3
     base = sam_dir or _DEFAULT_SAM_DIR
     for name in _AGENT_SESSION_DBS:
         path = os.path.join(base, name)
-        if os.path.exists(path):
-            os.remove(path)
+        if not os.path.exists(path):
+            continue
+        conn = sqlite3.connect(path)
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            for (table,) in cur.fetchall():
+                cur.execute(f"DELETE FROM {table}")
+            conn.commit()
+        finally:
+            conn.close()
 
 
 def full_reset(
@@ -141,4 +149,4 @@ def full_reset(
     full_reset()  →  clean, deterministic seed state every time.
     """
     reset_to_seed(seeder_path=seeder_path, dsn=dsn, timeout_s=timeout_s)
-    _delete_agent_session_dbs()
+    _clear_agent_session_dbs()

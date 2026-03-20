@@ -96,7 +96,7 @@ done
 
 # Clear stale session databases to prevent history conflicts on restart
 echo "🧹 Clearing stale session databases..."
-rm -f orchestrator.db webui_gateway.db acme_knowledge.db platform.db order_fulfillment_agent.db
+rm -f orchestrator.db webui_gateway.db acme_knowledge.db platform.db
 
   # Verify Solace Broker container is running
   if docker ps | grep -q solace; then

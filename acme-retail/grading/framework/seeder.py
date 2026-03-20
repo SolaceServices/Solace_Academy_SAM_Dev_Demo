@@ -18,6 +18,15 @@ _DEFAULT_SEEDER_PATH = os.environ.get(
     "/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/scripts/seed_orders_db.py",
 )
 
+# SAM working directory — where agent session .db files are created
+_DEFAULT_SAM_DIR = os.environ.get(
+    "SAM_DIR",
+    "/workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents/sam",
+)
+
+# Agent session SQLite files to delete on reset (both possible names)
+_AGENT_SESSION_DBS = ["order_fulfillment_agent.db"]
+
 _DEFAULT_DSN = os.environ.get(
     "ORDERS_DB_CONNECTION_STRING",
     "postgresql://acme:acme@localhost:5432/orders",
@@ -102,15 +111,34 @@ def reset_extra_rows(dsn: str = None):
         conn.close()
 
 
+def _delete_agent_session_dbs(sam_dir: str = None):
+    """
+    Delete the OrderFulfillmentAgent's SQLite session DB(s) so the next
+    SAM restart starts with no stale session history.
+
+    Safe to call while SAM is running — on Linux the file is unlinked from
+    the filesystem immediately, but the running process retains its open file
+    handle until it restarts.  The clean slate takes effect on the next
+    `sam run`.
+    """
+    base = sam_dir or _DEFAULT_SAM_DIR
+    for name in _AGENT_SESSION_DBS:
+        path = os.path.join(base, name)
+        if os.path.exists(path):
+            os.remove(path)
+
+
 def full_reset(
     seeder_path: str = _DEFAULT_SEEDER_PATH,
     dsn: str = None,
     timeout_s: int = 30,
 ):
     """
-    Truncate all tables and re-seed from JSON files.
+    Truncate all tables, re-seed from JSON files, and delete the agent's
+    SQLite session DB so the next SAM restart starts clean.
 
     This is the function most tests should call at the top of each test.
     full_reset()  →  clean, deterministic seed state every time.
     """
     reset_to_seed(seeder_path=seeder_path, dsn=dsn, timeout_s=timeout_s)
+    _delete_agent_session_dbs()

@@ -90,7 +90,7 @@
         },
         {
           "label": "3️⃣ Incident Response",
-          "value": "--scenario incident-response"
+          "value": "--test-incident-response"
         },
         {
           "label": "4️⃣ Knowledge Query",

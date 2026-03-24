@@ -25,7 +25,7 @@ _DEFAULT_SAM_DIR = os.environ.get(
 )
 
 # Agent session SQLite files to delete on reset (both possible names)
-_AGENT_SESSION_DBS = ["order_fulfillment_agent.db", "inventory_management_agent.db"]
+_AGENT_SESSION_DBS = ["order_fulfillment_agent.db", "inventory_management_agent.db", "incident_response_agent.db"]
 
 _DEFAULT_DSN = os.environ.get(
     "ORDERS_DB_CONNECTION_STRING",

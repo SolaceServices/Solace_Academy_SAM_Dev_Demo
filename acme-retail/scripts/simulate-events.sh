@@ -129,26 +129,6 @@ scenario_order_fulfillment() {
     print_summary
 }
 
-scenario_incident_response() {
-    echo -e "${MAGENTA}╔════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${MAGENTA}║  SCENARIO 3: Multi-Event Incident Creation             ║${NC}"
-    echo -e "${MAGENTA}║  Agent: Incident Response                              ║${NC}"
-    echo -e "${MAGENTA}╚════════════════════════════════════════════════════════╝${NC}"
-    echo ""
-
-    publish_event "acme/logistics/shipment-delayed" \
-        "{\"tracking_number\":\"TRK-$(get_timestamp)\",\"delay_hours\":48,\"carrier\":\"FastShip\",\"timestamp\":$(get_timestamp)}" \
-        "🚚"
-    sleep 2
-
-    publish_event "acme/pos/system-down" \
-        "{\"store_id\":\"STORE-42\",\"location\":\"Downtown\",\"severity\":\"critical\",\"timestamp\":$(get_timestamp)}" \
-        "💳"
-
-    echo -e "${GREEN}✅ Expected: acme/incidents/created (multiple)${NC}"
-    print_summary
-}
-
 scenario_knowledge_query() {
     echo -e "${MAGENTA}╔════════════════════════════════════════════════════════╗${NC}"
     echo -e "${MAGENTA}║  Testing: RAG Agent (Knowledge Retrieval)              ║${NC}"
@@ -269,12 +249,11 @@ run_scenario_from_cli() {
     case $scenario in
         order-fulfillment)      scenario_order_fulfillment ;;
         inventory-management)   scenario_inventory_management ;;
-        incident-response)      scenario_incident_response ;;
         knowledge-query)        scenario_knowledge_query ;;
         full-day)               scenario_full_day ;;
         *)
             echo -e "${RED}Unknown scenario: $scenario${NC}"
-            echo "Available: order-fulfillment, inventory-management, incident-response, knowledge-query, full-day"
+            echo "Available: order-fulfillment, inventory-management, knowledge-query, full-day"
             exit 1
             ;;
     esac
@@ -293,9 +272,8 @@ show_menu() {
     echo ""
     echo "  ${GREEN}1)${NC} Order Fulfillment        → Order Fulfillment Agent"
     echo "  ${GREEN}2)${NC} Inventory Management     → Inventory Management Agent"
-    echo "  ${GREEN}3)${NC} Incident Response        → Incident Response Agent"
-    echo "  ${GREEN}4)${NC} Knowledge Query          → Retail Knowledge (RAG)"
-    echo "  ${GREEN}5)${NC} Full Retail Day          → All Agents"
+    echo "  ${GREEN}3)${NC} Knowledge Query          → Retail Knowledge (RAG)"
+    echo "  ${GREEN}4)${NC} Full Retail Day          → All Agents"
     echo "  ${GREEN}q)${NC} Quit"
     echo ""
 }
@@ -303,14 +281,13 @@ show_menu() {
 interactive_mode() {
     while true; do
         show_menu
-        read -p "$(echo -e ${CYAN}"Select (1-5, q): "${NC})" choice
+        read -p "$(echo -e ${CYAN}"Select (1-4, q): "${NC})" choice
 
         case $choice in
             1) scenario_order_fulfillment ;;
             2) scenario_inventory_management ;;
-            3) scenario_incident_response ;;
-            4) scenario_knowledge_query ;;
-            5) scenario_full_day ;;
+            3) scenario_knowledge_query ;;
+            4) scenario_full_day ;;
             q|Q) exit 0 ;;
             *) echo -e "${RED}Invalid choice${NC}"; sleep 2 ;;
         esac

@@ -94,9 +94,12 @@ for p in 8000 8001 8443; do
   fuser -k "${p}/tcp" >/dev/null 2>&1 || true
 done
 
-# Clear stale session databases to prevent history conflicts on restart
+# Clear stale SQLite session databases and WAL journal files
 echo "🧹 Clearing stale session databases..."
-rm -f orchestrator.db webui_gateway.db acme_knowledge.db platform.db
+rm -f orchestrator.db orchestrator.db-shm orchestrator.db-wal \
+      webui_gateway.db webui_gateway.db-shm webui_gateway.db-wal \
+      acme_knowledge.db acme_knowledge.db-shm acme_knowledge.db-wal \
+      platform.db platform.db-shm platform.db-wal
 
   # Verify Solace Broker container is running
   if docker ps | grep -q solace; then
@@ -113,6 +116,13 @@ rm -f orchestrator.db webui_gateway.db acme_knowledge.db platform.db
     sleep 1
   done
 
+  # Create sam_gateway database if it doesn't exist (used by webui gateway instead of SQLite)
+  if ! docker exec 300-Agents-postgres psql -U acme -d postgres -tc \
+      "SELECT 1 FROM pg_database WHERE datname='sam_gateway'" 2>/dev/null | grep -q 1; then
+    echo "🗄️  Creating sam_gateway database..."
+    docker exec 300-Agents-postgres psql -U acme -d postgres -c "CREATE DATABASE sam_gateway" >/dev/null
+  fi
+
   # Seed only if the orders table is empty or doesn't exist yet
   if docker exec 300-Agents-postgres psql -U acme -d orders -t -c "SELECT 1 FROM orders LIMIT 1;" 2>/dev/null | grep -q 1; then
     echo "🌱 Database already seeded (skipping)."
@@ -120,6 +130,39 @@ rm -f orchestrator.db webui_gateway.db acme_knowledge.db platform.db
     echo "🌱 Seeding database..."
     python /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/scripts/seed_orders_db.py
   fi
+
+  # Clean up stale SAM event-mesh-gw queues from broker
+  # Each SAM restart creates new durable queues with unique UUIDs; old ones accumulate and
+  # eventually hit the broker's 100-endpoint license limit, preventing startup.
+  if curl -sf -u admin:admin "http://localhost:8080/SEMP/v2/config/msgVpns/default" >/dev/null 2>&1; then
+    echo "🧹 Cleaning up stale broker queues..."
+    python3 - <<'PYTHON'
+import urllib.request, urllib.parse, base64, json, sys
+creds = base64.b64encode(b'admin:admin').decode()
+def semp(path, method='GET'):
+    req = urllib.request.Request(f'http://localhost:8080/SEMP/v2/{path}', method=method)
+    req.add_header('Authorization', f'Basic {creds}')
+    try:
+        with urllib.request.urlopen(req) as r:
+            return json.loads(r.read())
+    except Exception:
+        return {}
+queues = semp('monitor/msgVpns/default/queues?count=200').get('data', [])
+deleted = sum(
+    1 for q in queues
+    if 'gdk/event-mesh-gw' in q['queueName'] or 'gdk/viz' in q['queueName']
+    if not semp(f'config/msgVpns/default/queues/{urllib.parse.quote(q["queueName"], safe="")}', 'DELETE')
+       or True
+)
+if deleted:
+    print(f'  Deleted {deleted} stale broker queue(s)')
+PYTHON
+  else
+    echo "⚠️  Broker SEMP not reachable — skipping queue cleanup"
+  fi
+
+# Point the webui gateway at PostgreSQL to avoid SQLite concurrent-write lock errors
+export WEB_UI_GATEWAY_DATABASE_URL="postgresql://acme:acme@localhost:5432/sam_gateway"
 
 # Print URL once the UI is reachable
 echo "⏳ Loading UI..."

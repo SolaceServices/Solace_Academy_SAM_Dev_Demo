@@ -25,7 +25,7 @@ _DEFAULT_SAM_DIR = os.environ.get(
 )
 
 # Agent session SQLite files to delete on reset (both possible names)
-_AGENT_SESSION_DBS = ["order_fulfillment_agent.db"]
+_AGENT_SESSION_DBS = ["order_fulfillment_agent.db", "inventory_management_agent.db"]
 
 _DEFAULT_DSN = os.environ.get(
     "ORDERS_DB_CONNECTION_STRING",
@@ -62,14 +62,13 @@ def _truncate_all(dsn: str = None):
 
 def reset_to_seed(seeder_path: str = _DEFAULT_SEEDER_PATH, timeout_s: int = 30, dsn: str = None):
     """
-    Truncate all tables then re-run seed_orders_db.py to restore seed values.
+    Re-run seed_orders_db.py with --data-only to restore seed values without
+    dropping/recreating tables.  Safe to call while SAM agents are running.
 
     Raises RuntimeError if the seeder exits with a non-zero return code.
     """
-    _truncate_all(dsn=dsn)
-
     result = subprocess.run(
-        [sys.executable, seeder_path],
+        [sys.executable, seeder_path, "--data-only"],
         capture_output=True,
         text=True,
         timeout=timeout_s,
@@ -113,27 +112,44 @@ def reset_extra_rows(dsn: str = None):
 
 def _clear_agent_session_dbs(sam_dir: str = None):
     """
-    Truncate all tables in the OrderFulfillmentAgent's SQLite session DB,
-    resetting it to the same empty state it was in when first created.
+    Clear session history tables in the agent SQLite session DBs so the next
+    task starts with a clean context.
 
-    Keeps the file and schema intact so the running SAM process is not
-    disrupted — only the session history is wiped.
+    Only deletes from session/event data tables. Skips alembic_version and
+    any table not in the known session-data set — preserving migration state
+    so SAM's Alembic upgrade check succeeds on the next task.
+
+    Uses a 10-second busy timeout so the operation waits briefly if SAM holds
+    a write lock, instead of failing immediately. Failures are non-fatal —
+    logged as a warning and the reset continues.
     """
     import sqlite3
+
+    # Only wipe session/history data — never touch alembic_version or other
+    # schema-management tables that SAM needs intact.
+    SESSION_DATA_TABLES = {"sessions", "app_states", "user_states", "events"}
+
     base = sam_dir or _DEFAULT_SAM_DIR
     for name in _AGENT_SESSION_DBS:
         path = os.path.join(base, name)
         if not os.path.exists(path):
             continue
-        conn = sqlite3.connect(path)
         try:
-            cur = conn.cursor()
-            cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
-            for (table,) in cur.fetchall():
-                cur.execute(f"DELETE FROM {table}")
-            conn.commit()
-        finally:
-            conn.close()
+            conn = sqlite3.connect(path, timeout=10)
+            try:
+                cur = conn.cursor()
+                cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                tables = [row[0] for row in cur.fetchall()]
+                for table in tables:
+                    if table in SESSION_DATA_TABLES:
+                        cur.execute(f"DELETE FROM {table}")
+                conn.commit()
+            finally:
+                conn.close()
+        except Exception as exc:
+            # Non-fatal: if the DB is locked or unavailable, log and move on.
+            # The PostgreSQL data reset is what matters for test correctness.
+            print(f"  ⚠️  Warning: could not clear {name}: {exc}")
 
 
 def full_reset(

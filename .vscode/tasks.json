@@ -81,12 +81,12 @@
       "description": "Which Acme Retail scenario do you want to simulate?",
       "options": [
         {
-          "label": "1️⃣ Low Stock Alert",
-          "value": "--scenario low-stock"
+          "label": "1️⃣ Order Fulfillment",
+          "value": "--test-order-fulfillment"
         },
         {
-          "label": "2️⃣ Order Fulfillment",
-          "value": "--test-order-fulfillment"
+          "label": "2️⃣ Inventory Management",
+          "value": "--test-inventory-management"
         },
         {
           "label": "3️⃣ Incident Response",
@@ -97,11 +97,7 @@
           "value": "--scenario knowledge-query"
         },
         {
-          "label": "5️⃣ Analytics Dashboard",
-          "value": "--scenario analytics-dashboard"
-        },
-        {
-          "label": "6️⃣ Full Retail Day",
+          "label": "5️⃣ Full Retail Day",
           "value": "--scenario full-day"
         }
       ]

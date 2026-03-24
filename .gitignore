@@ -5,3 +5,23 @@
 
 # AI assistant context file
 CLAUDE.md
+
+# SAM student-created configs (each student builds these themselves)
+*/sam/configs/
+
+# SAM runtime artifacts
+*/sam/.venv/
+*/sam/node_modules/
+*/sam/package-lock.json
+*/sam/package.json
+*/sam/*.db
+*/sam/*.db-shm
+*/sam/*.db-wal
+*/sam/*.log
+*/sam/src/
+*/sam/.sam/
+*/sam/mcp_postgres_rw.js
+
+# Python cache
+**/__pycache__/
+**/*.pyc

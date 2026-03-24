@@ -99,7 +99,9 @@ echo "🧹 Clearing stale session databases..."
 rm -f orchestrator.db orchestrator.db-shm orchestrator.db-wal \
       webui_gateway.db webui_gateway.db-shm webui_gateway.db-wal \
       acme_knowledge.db acme_knowledge.db-shm acme_knowledge.db-wal \
-      platform.db platform.db-shm platform.db-wal
+      platform.db platform.db-shm platform.db-wal \
+      order_fulfillment_agent.db order_fulfillment_agent.db-shm order_fulfillment_agent.db-wal \
+      inventory_management_agent.db inventory_management_agent.db-shm inventory_management_agent.db-wal
 
   # Verify Solace Broker container is running
   if docker ps | grep -q solace; then
@@ -160,6 +162,9 @@ PYTHON
   else
     echo "⚠️  Broker SEMP not reachable — skipping queue cleanup"
   fi
+
+# Copy custom read-write MCP postgres server next to node_modules so Node can resolve its imports
+cp /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/mcp-servers/mcp_postgres_rw.js "$SAM_DIR/mcp_postgres_rw.js"
 
 # Point the webui gateway at PostgreSQL to avoid SQLite concurrent-write lock errors
 export WEB_UI_GATEWAY_DATABASE_URL="postgresql://acme:acme@localhost:5432/sam_gateway"

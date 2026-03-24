@@ -10,6 +10,11 @@ case "$1" in
     exec /workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents/sam/.venv/bin/python \
       -m tests.test_order_fulfillment
     ;;
+  --test-inventory-management)
+    cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/grading
+    exec /workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents/sam/.venv/bin/python \
+      -m tests.test_inventory_management
+    ;;
   *)
     exec bash ./simulate-events.sh "$@"
     ;;

@@ -420,6 +420,13 @@ def main():
         default=DEFAULT_DB_URL,
         help="PostgreSQL connection URL (default: %(default)s)"
     )
+    parser.add_argument(
+        "--data-only",
+        action="store_true",
+        default=False,
+        help="Skip schema creation (DROP/CREATE tables). Only DELETE existing rows and re-insert seed data. "
+             "Safe to run while SAM agents are running."
+    )
     args = parser.parse_args()
 
     seed_dir = os.path.join(args.root, SEED_DATA_DIR)
@@ -446,9 +453,13 @@ def main():
     cur = conn.cursor()
 
     try:
-        print("Creating / verifying schema...")
-        create_schema(cur)
-        ensure_extra_tables(cur)
+        if args.data_only:
+            print("Data-only mode: skipping schema DROP/CREATE, verifying extra tables only...")
+            ensure_extra_tables(cur)
+        else:
+            print("Creating / verifying schema...")
+            create_schema(cur)
+            ensure_extra_tables(cur)
 
         print("\nLoading JSON files...")
         orders_data    = load_json(os.path.join(seed_dir, "orders.json"))

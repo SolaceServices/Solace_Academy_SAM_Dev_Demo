@@ -219,6 +219,23 @@
       "supplier_name": "TechSupply Global",
       "last_restocked": "2026-03-03T16:00:00Z",
       "status": "in_stock"
+    },
+    {
+      "item_id": "SKU-DOCKSTATION-007",
+      "product_name": "USB-C Docking Station Pro",
+      "category": "Accessories",
+      "stock_quantity": 0,
+      "reserved_quantity": 0,
+      "available_quantity": 0,
+      "reorder_level": 8,
+      "reorder_quantity": 20,
+      "unit_cost": 120,
+      "unit_price": 199.99,
+      "warehouse_location": "WH-F-603",
+      "supplier_id": "SUP-007",
+      "supplier_name": "Cable Connections Inc",
+      "last_restocked": "2026-02-20T10:00:00Z",
+      "status": "out_of_stock"
     }
   ],
   "warehouses": [

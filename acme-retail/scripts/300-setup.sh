@@ -101,7 +101,9 @@ rm -f orchestrator.db orchestrator.db-shm orchestrator.db-wal \
       acme_knowledge.db acme_knowledge.db-shm acme_knowledge.db-wal \
       platform.db platform.db-shm platform.db-wal \
       order_fulfillment_agent.db order_fulfillment_agent.db-shm order_fulfillment_agent.db-wal \
-      inventory_management_agent.db inventory_management_agent.db-shm inventory_management_agent.db-wal
+      inventory_management_agent.db inventory_management_agent.db-shm inventory_management_agent.db-wal \
+      incident_response_agent.db incident_response_agent.db-shm incident_response_agent.db-wal \
+      logistics_agent.db logistics_agent.db-shm logistics_agent.db-wal
 
   # Verify Solace Broker container is running
   if docker ps | grep -q solace; then

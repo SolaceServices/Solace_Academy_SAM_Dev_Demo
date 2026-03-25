@@ -5,7 +5,7 @@ Tests five event-driven scenarios covering the agent's primary responsibilities:
   1. New order with in-stock item     → agent responds with "validated" + order saved to DB
   2. New order with out-of-stock item → agent responds with "blocked" + order saved to DB
   3. Inventory restocked              → blocked order status updated to "validated" in DB
-  4. Shipment delayed                 → incident created + order estimated_delivery updated in DB
+  4. Shipment delayed                 → order estimated_delivery updated in DB 
   5. Order cancelled                  → order status set to "cancelled" in DB
 
 Run directly:
@@ -295,20 +295,19 @@ def run_tests(student_email="student@example.com"):
         except Exception as exc:
             assert False, str(exc)
 
-    # ── Test 4 — Shipment delay → incident created + order delivery updated ────
+    # ── Test 4 — Shipment delay → order delivery updated (incident creation is IncidentResponseAgent's job) ────
     print(_s(f"\n  ── Test 4 ─{'─' * (W - 12)}", "2"))
-    print(_s("  Shipment delayed (+30h)  →  incident created + order delivery updated", "1"))
+    print(_s("  Shipment delayed (+30h)  →  order delivery updated in database", "1"))
     print(_s(f"  Published to:  {TOPIC_SHIPMENT_DELAYED}", "2"))
-    print(_s(f"  Listening on:  {TOPIC_INCIDENT_CREATED}", "2"))
+    print(_s(f"  Listening on:  {TOPIC_ORDER_RESULT}", "2"))
     msg4 = None
-    incident_count_before = row_count("incidents", "type = %s", ("shipment_delay",))
     results.section(
-        f"Test 4 — Shipment {DELAYED_SHIPMENT_ID} delayed +30h → incident + order update"
+        f"Test 4 — Shipment {DELAYED_SHIPMENT_ID} delayed +30h → order estimated_delivery updated"
     )
     try:
         with Spinner("Waiting for agent response"):
             msg4 = _run_scenario(
-                sub_topic=TOPIC_INCIDENT_CREATED,
+                sub_topic=TOPIC_ORDER_RESULT,
                 pub_topic=TOPIC_SHIPMENT_DELAYED,
                 pub_payload={
                     "shipment_id": DELAYED_SHIPMENT_ID,
@@ -323,21 +322,14 @@ def run_tests(student_email="student@example.com"):
             )
     except Exception as exc:
         results.record("t4_response_received", False, str(exc),
-                       label="Listening on acme/incidents/created — message received within 25s")
+                       label="Listening on acme/orders/decision — message received within 25s")
 
     with results.test("t4_response_received",
-                      label="Listening on acme/incidents/created — message received within 25s"):
-        assert msg4 is not None, f"No message on {TOPIC_INCIDENT_CREATED} within {AGENT_TIMEOUT_S}s"
+                      label="Listening on acme/orders/decision — message received within 25s"):
+        assert msg4 is not None, f"No message on {TOPIC_ORDER_RESULT} within {AGENT_TIMEOUT_S}s"
     time.sleep(POST_MSG_SLEEP_S)
-    with results.test("t4_incident_created_in_db",
-                      label="New shipment_delay incident row created in incidents table"):
-        incident_count_after = row_count("incidents", "type = %s", ("shipment_delay",))
-        assert incident_count_after > incident_count_before, (
-            f"No new shipment_delay incident found in DB "
-            f"(before={incident_count_before}, after={incident_count_after})"
-        )
     with results.test("t4_order_delivery_updated",
-                      label=f"Order {DELAYED_ORDER_ID} estimated_delivery updated in database"):
+                      label=f"Order {DELAYED_ORDER_ID} estimated_delivery updated to {DELAYED_NEW_DELIVERY}"):
         try:
             assert_field_equals(
                 "orders", "order_id", DELAYED_ORDER_ID,

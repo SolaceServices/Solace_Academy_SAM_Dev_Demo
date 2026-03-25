@@ -8,6 +8,7 @@ CLAUDE.md
 
 # SAM student-created configs (each student builds these themselves)
 */sam/configs/
+*/sam/opencode.json
 
 # SAM runtime artifacts
 */sam/.venv/

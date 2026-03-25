@@ -15,6 +15,21 @@ case "$1" in
     exec /workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents/sam/.venv/bin/python \
       -m tests.test_inventory_management
     ;;
+  --test-incident-response)
+    cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/grading
+    exec /workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents/sam/.venv/bin/python \
+      -m tests.test_incident_response
+    ;;
+  --test-knowledge-query)
+    cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/grading
+    exec /workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents/sam/.venv/bin/python \
+      -m tests.test_knowledge_query
+    ;;
+  --test-logistics)
+    cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/grading
+    exec /workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents/sam/.venv/bin/python \
+      -m tests.test_logistics
+    ;;
   *)
     exec bash ./simulate-events.sh "$@"
     ;;

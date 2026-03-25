@@ -210,6 +210,48 @@ class BrokerClient:
         return result
 
     # ------------------------------------------------------------------
+    # Drain
+    # ------------------------------------------------------------------
+    def drain_messages(
+        self,
+        topic_expressions: list,
+        idle_s: float = 3.0,
+        max_wait_s: float = 30.0,
+    ) -> int:
+        """
+        Subscribe to all *topic_expressions* simultaneously and discard every
+        message that arrives until *idle_s* seconds pass with no new message
+        or *max_wait_s* elapses.  Returns the number of messages drained.
+
+        Used by full_reset() to consume stale in-flight pipeline messages
+        left over from a previous test suite before the next one starts.
+        """
+        self._ensure_connected()
+
+        subscriptions = [TopicSubscription.of(t) for t in topic_expressions]
+        receiver = (
+            self._service.create_direct_message_receiver_builder()
+            .with_subscriptions(subscriptions)
+            .on_back_pressure_drop_oldest(100)
+            .build()
+        )
+        receiver.start()
+        drained = 0
+        try:
+            deadline = time.monotonic() + max_wait_s
+            while time.monotonic() < deadline:
+                remaining_ms = int(min(idle_s, deadline - time.monotonic()) * 1000)
+                if remaining_ms <= 0:
+                    break
+                inbound = receiver.receive_message(timeout=remaining_ms)
+                if inbound is None:
+                    break  # idle_s of silence — pipeline is quiet
+                drained += 1
+        finally:
+            receiver.terminate()
+        return drained
+
+    # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
     def _ensure_connected(self):

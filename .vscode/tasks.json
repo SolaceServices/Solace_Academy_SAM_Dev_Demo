@@ -90,14 +90,18 @@
         },
         {
           "label": "3️⃣ Incident Response",
-          "value": "--scenario incident-response"
+          "value": "--test-incident-response"
         },
         {
-          "label": "4️⃣ Knowledge Query",
-          "value": "--scenario knowledge-query"
+          "label": "4️⃣ Logistics Management",
+          "value": "--test-logistics"
         },
         {
-          "label": "5️⃣ Full Retail Day",
+          "label": "5️⃣ Knowledge Query",
+          "value": "--test-knowledge-query"
+        },
+        {
+          "label": "6️⃣ Full Retail Day",
           "value": "--scenario full-day"
         }
       ]

@@ -25,7 +25,16 @@ _DEFAULT_SAM_DIR = os.environ.get(
 )
 
 # Agent session SQLite files to delete on reset (both possible names)
-_AGENT_SESSION_DBS = ["order_fulfillment_agent.db", "inventory_management_agent.db"]
+_AGENT_SESSION_DBS = ["acme_knowledge.db", "order_fulfillment_agent.db", "inventory_management_agent.db", "incident_response_agent.db", "logistics_agent.db"]
+
+# Pipeline output topics that may carry stale in-flight messages between test suites.
+# A previous suite's async LLM pipeline can publish here after its own tests have
+# completed, then race with the next suite's subscriber.
+_PIPELINE_RESPONSE_TOPICS = [
+    "acme/incidents/response",
+    "acme/orders/decision",
+    "acme/inventory/updated",
+]
 
 _DEFAULT_DSN = os.environ.get(
     "ORDERS_DB_CONNECTION_STRING",
@@ -110,6 +119,32 @@ def reset_extra_rows(dsn: str = None):
         conn.close()
 
 
+def _drain_broker_topics(topics=None, idle_s: float = 3.0, max_wait_s: float = 30.0):
+    """
+    Subscribe to pipeline response/output topics and discard any messages that
+    arrive, consuming stale in-flight messages left over from a previous test
+    suite's async pipeline.
+
+    Subscribes to all topics simultaneously via one receiver; stops after
+    idle_s seconds of silence across all topics, or max_wait_s total.
+    Non-fatal if the broker is unreachable.
+
+    Must be called BEFORE reset_to_seed() so it runs concurrently with the
+    still-in-flight LLM pipeline from the previous suite.
+    """
+    import time as _time
+    from framework.broker import BrokerClient
+    try:
+        with BrokerClient() as client:
+            client.drain_messages(
+                topics or _PIPELINE_RESPONSE_TOPICS,
+                idle_s=idle_s,
+                max_wait_s=max_wait_s,
+            )
+    except Exception:
+        pass  # non-fatal — drain is best-effort
+
+
 def _clear_agent_session_dbs(sam_dir: str = None):
     """
     Clear session history tables in the agent SQLite session DBs so the next
@@ -164,5 +199,6 @@ def full_reset(
     This is the function most tests should call at the top of each test.
     full_reset()  →  clean, deterministic seed state every time.
     """
+    _drain_broker_topics()
     reset_to_seed(seeder_path=seeder_path, dsn=dsn, timeout_s=timeout_s)
     _clear_agent_session_dbs()

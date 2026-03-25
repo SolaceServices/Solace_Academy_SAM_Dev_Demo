@@ -59,8 +59,8 @@ TOPIC_ORDER_CANCELLED   = "acme/orders/cancelled"
 TOPIC_ORDER_RESULT      = "acme/orders/decision"
 TOPIC_INCIDENT_CREATED  = "acme/incidents/created"
 
-AGENT_TIMEOUT_S  = 25
-POST_MSG_SLEEP_S = 2   # let agent finish DB write before asserting
+AGENT_TIMEOUT_S  = 30
+POST_MSG_SLEEP_S = 3   # let agent finish DB write before asserting
 
 
 # ---------------------------------------------------------------------------
@@ -177,9 +177,9 @@ def run_tests(student_email="student@example.com"):
     print(_s("  Publishes events to the broker and checks agent responses.", "2"))
     print(_s("═" * W, "1", "36"))
 
-    print(f"\n  🔄  Resetting database to seed state...")
     try:
-        full_reset()
+        with Spinner("Resetting database to seed state"):
+            full_reset()
         print(f"  ✅  Database reset complete.")
     except Exception as exc:
         print(f"  ❌  Database reset failed: {exc}")
@@ -200,6 +200,7 @@ def run_tests(student_email="student@example.com"):
                 sub_topic=TOPIC_ORDER_RESULT,
                 pub_topic=TOPIC_ORDER_CREATED,
                 pub_payload=_new_order_payload(order_id_1, IN_STOCK_SKU, IN_STOCK_NAME, IN_STOCK_PRICE),
+                predicate=lambda msg: order_id_1 in json.dumps(msg),
             )
     except Exception as exc:
         results.record("t1_response_received", False, str(exc),
@@ -235,6 +236,7 @@ def run_tests(student_email="student@example.com"):
                 sub_topic=TOPIC_ORDER_RESULT,
                 pub_topic=TOPIC_ORDER_CREATED,
                 pub_payload=_new_order_payload(order_id_2, OOS_SKU, OOS_NAME, OOS_PRICE),
+                predicate=lambda msg: order_id_2 in json.dumps(msg),
             )
     except Exception as exc:
         results.record("t2_response_received", False, str(exc),
@@ -279,6 +281,7 @@ def run_tests(student_email="student@example.com"):
                     "new_stock_quantity": 30,
                     "new_status": "in_stock",
                 },
+                predicate=lambda msg: BLOCKED_ORDER_ID in json.dumps(msg),
             )
     except Exception as exc:
         results.record("t3_response_received", False, str(exc),
@@ -319,6 +322,7 @@ def run_tests(student_email="student@example.com"):
                     "new_estimated_delivery": DELAYED_NEW_DELIVERY,
                     "delay_hours": 30,
                 },
+                predicate=lambda msg: DELAYED_ORDER_ID in json.dumps(msg) or DELAYED_SHIPMENT_ID in json.dumps(msg),
             )
     except Exception as exc:
         results.record("t4_response_received", False, str(exc),
@@ -355,6 +359,7 @@ def run_tests(student_email="student@example.com"):
                     "reason": "Customer requested cancellation",
                     "cancelled_by": "customer",
                 },
+                predicate=lambda msg: CANCEL_ORDER_ID in json.dumps(msg),
             )
     except Exception as exc:
         results.record("t5_response_received", False, str(exc),

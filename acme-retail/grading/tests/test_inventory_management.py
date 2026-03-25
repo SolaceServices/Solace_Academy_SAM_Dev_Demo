@@ -2,7 +2,7 @@
 test_inventory_management.py — Grading tests for the InventoryManagementAgent.
 
 Tests three independent event-driven scenarios covering the agent's stock adjustment responsibilities:
-  1. Supplier restock received  → out-of-stock item (SKU-TABLET-055) updated to in_stock in DB
+  1. Supplier restock received  → out-of-stock item (SKU-PHONE-099) updated to in_stock in DB
   2. Write-off adjustment       → low-stock item (SKU-LAPTOP-002) reduced to out_of_stock in DB
   3. Restock after write-off    → out-of-stock item (SKU-DOCKSTATION-007) updated to in_stock in DB
 
@@ -40,8 +40,8 @@ def _s(text: str, *codes: str) -> str:
 # ---------------------------------------------------------------------------
 # Seed data constants
 # ---------------------------------------------------------------------------
-OOS_SKU         = "SKU-TABLET-055"   # seed: available=0, out_of_stock
-OOS_NAME        = "Pro Tablet 12"
+OOS_SKU         = "SKU-PHONE-099"    # seed: available=0, out_of_stock
+OOS_NAME        = "Premium Smartphone X"
 OOS_SUPPLIER_ID = "SUP-001"
 OOS_SUPPLIER    = "TechSupply Global"
 
@@ -60,7 +60,7 @@ TOPIC_INVENTORY_ADJUSTMENT = "acme/inventory/adjustment"
 TOPIC_INVENTORY_UPDATED    = "acme/inventory/updated"
 
 AGENT_TIMEOUT_S  = 30
-POST_MSG_SLEEP_S = 2   # let agent finish DB write before asserting
+POST_MSG_SLEEP_S = 3   # let agent finish DB write before asserting
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +107,7 @@ def _text(msg: dict) -> str:
     return json.dumps(msg).lower()
 
 
-def _run_scenario(sub_topic, pub_topic, pub_payload, timeout_s=AGENT_TIMEOUT_S):
+def _run_scenario(sub_topic, pub_topic, pub_payload, predicate=None, timeout_s=AGENT_TIMEOUT_S):
     result_q = queue.Queue()
     error_q  = queue.Queue()
     ready    = threading.Event()
@@ -117,6 +117,7 @@ def _run_scenario(sub_topic, pub_topic, pub_payload, timeout_s=AGENT_TIMEOUT_S):
             with BrokerClient() as sub:
                 msg = sub.wait_for_message(
                     sub_topic, timeout_s=timeout_s,
+                    predicate=predicate,
                     on_ready=ready.set,
                 )
                 result_q.put(msg)
@@ -155,9 +156,9 @@ def run_tests(student_email="student@example.com"):
     print(_s("  Publishes events to the broker and checks agent responses.", "2"))
     print(_s("═" * W, "1", "36"))
 
-    print(f"\n  🔄  Resetting database to seed state...")
     try:
-        full_reset()
+        with Spinner("Resetting database to seed state"):
+            full_reset()
         print(f"  ✅  Database reset complete.")
     except Exception as exc:
         print(f"  ❌  Database reset failed: {exc}")
@@ -184,6 +185,7 @@ def run_tests(student_email="student@example.com"):
                     "supplier_id": OOS_SUPPLIER_ID,
                     "supplier_name": OOS_SUPPLIER,
                 },
+                predicate=lambda msg: OOS_SKU in json.dumps(msg),
             )
     except Exception as exc:
         results.record("t1_response_received", False, str(exc),
@@ -226,6 +228,7 @@ def run_tests(student_email="student@example.com"):
                     "quantity_delta": WRITE_OFF_DELTA,
                     "reason": "Damaged during warehouse inspection",
                 },
+                predicate=lambda msg: LOW_SKU in json.dumps(msg),
             )
     except Exception as exc:
         results.record("t2_response_received", False, str(exc),
@@ -268,6 +271,7 @@ def run_tests(student_email="student@example.com"):
                     "supplier_id": "SUP-007",
                     "supplier_name": "Cable Connections Inc",
                 },
+                predicate=lambda msg: OOS_SKU_2 in json.dumps(msg),
             )
     except Exception as exc:
         results.record("t3_response_received", False, str(exc),
@@ -277,6 +281,12 @@ def run_tests(student_email="student@example.com"):
                       label="Listening on acme/inventory/updated — message received within 30s"):
         assert msg3 is not None, f"No message on {TOPIC_INVENTORY_UPDATED} within {AGENT_TIMEOUT_S}s"
     time.sleep(POST_MSG_SLEEP_S)
+    with results.test("t3_available_qty_updated",
+                      label=f"{OOS_SKU_2} available_quantity updated to {RESTOCK_QTY_2} in database"):
+        try:
+            assert_field_equals("inventory", "item_id", OOS_SKU_2, "available_quantity", RESTOCK_QTY_2)
+        except Exception as exc:
+            assert False, str(exc)
     with results.test("t3_status_in_stock",
                       label=f"{OOS_SKU_2} status restored to 'in_stock' after restock (qty {RESTOCK_QTY_2} > reorder_level 8)"):
         try:

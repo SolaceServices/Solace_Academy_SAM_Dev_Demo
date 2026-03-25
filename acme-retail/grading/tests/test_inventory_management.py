@@ -1,14 +1,14 @@
 """
 test_inventory_management.py — Grading tests for the InventoryManagementAgent.
 
-Tests three event-driven scenarios covering the agent's stock adjustment responsibilities:
-  1. Supplier restock received  → out-of-stock item updated to in_stock in DB
-  2. Write-off adjustment       → low-stock item reduced to out_of_stock in DB
-  3. Restock after write-off    → item status restored to in_stock in DB
+Tests three independent event-driven scenarios covering the agent's stock adjustment responsibilities:
+  1. Supplier restock received  → out-of-stock item (SKU-TABLET-055) updated to in_stock in DB
+  2. Write-off adjustment       → low-stock item (SKU-LAPTOP-002) reduced to out_of_stock in DB
+  3. Restock after write-off    → out-of-stock item (SKU-DOCKSTATION-007) updated to in_stock in DB
 
-The tests run sequentially after a single full_reset(). Tests 2 and 3 use the
-same SKU (SKU-LAPTOP-002) — Test 3 intentionally starts from the state left by
-Test 2 (available_quantity=0) to verify a restock after a write-off.
+All tests run sequentially after a single full_reset() and use independent SKUs. Each test
+validates a distinct inventory operation with separate seed data, ensuring reliable results
+regardless of execution order.
 
 Run directly:
   cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/grading
@@ -44,6 +44,9 @@ OOS_SKU         = "SKU-TABLET-055"   # seed: available=0, out_of_stock
 OOS_NAME        = "Pro Tablet 12"
 OOS_SUPPLIER_ID = "SUP-001"
 OOS_SUPPLIER    = "TechSupply Global"
+
+OOS_SKU_2       = "SKU-DOCKSTATION-007"  # seed: available=0, out_of_stock (for Test 3)
+OOS_NAME_2      = "USB-C Docking Station Pro"
 
 LOW_SKU         = "SKU-LAPTOP-002"   # seed: available=3, reorder_level=10, low_stock
 LOW_NAME        = "Gaming Laptop Xtreme"
@@ -245,16 +248,14 @@ def run_tests(student_email="student@example.com"):
         except Exception as exc:
             assert False, str(exc)
 
-    # ── Test 3 — Restock previously zeroed item → in_stock ────────────────────
-    # Starts from state left by Test 2: LOW_SKU at available=0, out_of_stock.
+    # ── Test 3 — Restock out-of-stock item → in_stock ────────────────────────
     print(_s(f"\n  ── Test 3 ─{'─' * (W - 12)}", "2"))
     print(_s("  Restock after write-off  →  item status restored to in_stock", "1"))
     print(_s(f"  Published to:  {TOPIC_RESTOCK_RECEIVED}", "2"))
     print(_s(f"  Listening on:  {TOPIC_INVENTORY_UPDATED}", "2"))
-    print(_s(f"  Pre-condition: {LOW_SKU} at available=0 (state from Test 2)", "2"))
     msg3 = None
     results.section(
-        f"Test 3 — Restock {LOW_SKU} ({LOW_NAME}) +{RESTOCK_QTY_2} units (out_of_stock → in_stock)"
+        f"Test 3 — Restock {OOS_SKU_2} ({OOS_NAME_2}) +{RESTOCK_QTY_2} units (out_of_stock → in_stock)"
     )
     try:
         with Spinner("Waiting for agent response"):
@@ -262,10 +263,10 @@ def run_tests(student_email="student@example.com"):
                 sub_topic=TOPIC_INVENTORY_UPDATED,
                 pub_topic=TOPIC_RESTOCK_RECEIVED,
                 pub_payload={
-                    "item_id": LOW_SKU,
+                    "item_id": OOS_SKU_2,
                     "quantity_received": RESTOCK_QTY_2,
-                    "supplier_id": "SUP-001",
-                    "supplier_name": "TechSupply Global",
+                    "supplier_id": "SUP-007",
+                    "supplier_name": "Cable Connections Inc",
                 },
             )
     except Exception as exc:
@@ -277,9 +278,9 @@ def run_tests(student_email="student@example.com"):
         assert msg3 is not None, f"No message on {TOPIC_INVENTORY_UPDATED} within {AGENT_TIMEOUT_S}s"
     time.sleep(POST_MSG_SLEEP_S)
     with results.test("t3_status_in_stock",
-                      label=f"{LOW_SKU} status restored to 'in_stock' after restock (qty {RESTOCK_QTY_2} > reorder_level 10)"):
+                      label=f"{OOS_SKU_2} status restored to 'in_stock' after restock (qty {RESTOCK_QTY_2} > reorder_level 8)"):
         try:
-            assert_inventory_status(LOW_SKU, "in_stock")
+            assert_inventory_status(OOS_SKU_2, "in_stock")
         except Exception as exc:
             assert False, str(exc)
 

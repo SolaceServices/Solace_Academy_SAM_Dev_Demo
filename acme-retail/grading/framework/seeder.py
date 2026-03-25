@@ -25,7 +25,7 @@ _DEFAULT_SAM_DIR = os.environ.get(
 )
 
 # Agent session SQLite files to delete on reset (both possible names)
-_AGENT_SESSION_DBS = ["order_fulfillment_agent.db", "inventory_management_agent.db", "incident_response_agent.db"]
+_AGENT_SESSION_DBS = ["acme_knowledge.db", "order_fulfillment_agent.db", "inventory_management_agent.db", "incident_response_agent.db", "logistics_agent.db"]
 
 # Pipeline output topics that may carry stale in-flight messages between test suites.
 # A previous suite's async LLM pipeline can publish here after its own tests have

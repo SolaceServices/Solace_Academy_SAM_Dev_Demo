@@ -108,7 +108,7 @@ def _text(msg: dict) -> str:
     return json.dumps(msg).lower()
 
 
-def _run_scenario(sub_topic, pub_topic, pub_payload, timeout_s=AGENT_TIMEOUT_S):
+def _run_scenario(sub_topic, pub_topic, pub_payload, predicate=None, timeout_s=AGENT_TIMEOUT_S):
     result_q = queue.Queue()
     error_q  = queue.Queue()
     ready    = threading.Event()
@@ -118,6 +118,7 @@ def _run_scenario(sub_topic, pub_topic, pub_payload, timeout_s=AGENT_TIMEOUT_S):
             with BrokerClient() as sub:
                 msg = sub.wait_for_message(
                     sub_topic, timeout_s=timeout_s,
+                    predicate=predicate,
                     on_ready=ready.set,
                 )
                 result_q.put(msg)
@@ -156,9 +157,9 @@ def run_tests(student_email="student@example.com"):
     print(_s("  Publishes events to the broker and checks agent responses.", "2"))
     print(_s("═" * W, "1", "36"))
 
-    print(f"\n  🔄  Resetting database to seed state...")
     try:
-        full_reset()
+        with Spinner("Resetting database to seed state"):
+            full_reset()
         print(f"  ✅  Database reset complete.")
     except Exception as exc:
         print(f"  ❌  Database reset failed: {exc}")
@@ -191,6 +192,7 @@ def run_tests(student_email="student@example.com"):
                         "Available quantity: 0, Required quantity: 5."
                     ),
                 },
+                predicate=lambda msg: "inventory_shortage" in json.dumps(msg).lower(),
             )
     except Exception as exc:
         results.record("t1_response_received", False, str(exc),
@@ -289,6 +291,7 @@ def run_tests(student_email="student@example.com"):
                     "new_stock_quantity": 50,
                     "new_status": "in_stock",
                 },
+                predicate=lambda msg: HIGH_SEV_INCIDENT_ID in json.dumps(msg),
             )
     except Exception as exc:
         results.record("t3_response_received", False, str(exc),
@@ -329,6 +332,7 @@ def run_tests(student_email="student@example.com"):
                     ),
                     "timestamp": "2026-03-24T10:00:00Z",
                 },
+                predicate=lambda msg: "system_error" in json.dumps(msg).lower(),
             )
     except Exception as exc:
         results.record("t4_response_received", False, str(exc),

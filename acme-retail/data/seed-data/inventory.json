@@ -119,6 +119,26 @@
       "incident_id": "INC-2026-015"
     },
     {
+      "item_id": "SKU-PHONE-099",
+      "product_name": "Premium Smartphone X",
+      "category": "Mobile Devices",
+      "stock_quantity": 0,
+      "reserved_quantity": 0,
+      "available_quantity": 0,
+      "reorder_level": 12,
+      "reorder_quantity": 30,
+      "unit_cost": 450,
+      "unit_price": 699.99,
+      "warehouse_location": "WH-A-104",
+      "supplier_id": "SUP-001",
+      "supplier_name": "TechSupply Global",
+      "last_restocked": "2026-02-15T10:00:00Z",
+      "expected_restock_date": "2026-03-18T00:00:00Z",
+      "status": "out_of_stock",
+      "notes": "Awaiting shipment from supplier"
+    },
+
+    {
       "item_id": "SKU-HEADSET-022",
       "product_name": "Noise Cancelling Headset Pro",
       "category": "Audio",

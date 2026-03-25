@@ -32,6 +32,7 @@ _AGENT_SESSION_DBS = ["acme_knowledge.db", "order_fulfillment_agent.db", "invent
 # completed, then race with the next suite's subscriber.
 _PIPELINE_RESPONSE_TOPICS = [
     "acme/incidents/response",
+    "acme/incidents/created",
     "acme/orders/decision",
     "acme/inventory/updated",
 ]
@@ -119,7 +120,7 @@ def reset_extra_rows(dsn: str = None):
         conn.close()
 
 
-def _drain_broker_topics(topics=None, idle_s: float = 3.0, max_wait_s: float = 30.0):
+def _drain_broker_topics(topics=None, idle_s: float = 12.0, max_wait_s: float = 60.0):
     """
     Subscribe to pipeline response/output topics and discard any messages that
     arrive, consuming stale in-flight messages left over from a previous test
@@ -198,7 +199,14 @@ def full_reset(
 
     This is the function most tests should call at the top of each test.
     full_reset()  →  clean, deterministic seed state every time.
+
+    Process:
+    1. Drain stale messages from previous suite's in-flight pipelines
+    2. Reset database to seed state
+    3. Drain again to catch any pipelines that responded during the reset
+    4. Clear agent session DBs
     """
     _drain_broker_topics()
     reset_to_seed(seeder_path=seeder_path, dsn=dsn, timeout_s=timeout_s)
+    _drain_broker_topics(idle_s=5.0, max_wait_s=15.0)
     _clear_agent_session_dbs()

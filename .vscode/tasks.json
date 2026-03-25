@@ -81,24 +81,24 @@
       "description": "Which Acme Retail scenario do you want to simulate?",
       "options": [
         {
-          "label": "1️⃣ Order Fulfillment",
+          "label": "1️⃣ Knowledge Query",
+          "value": "--test-knowledge-query"
+        },
+        {
+          "label": "2️⃣ Order Fulfillment",
           "value": "--test-order-fulfillment"
         },
         {
-          "label": "2️⃣ Inventory Management",
+          "label": "3️⃣ Inventory Management",
           "value": "--test-inventory-management"
         },
         {
-          "label": "3️⃣ Incident Response",
+          "label": "4️⃣ Incident Response",
           "value": "--test-incident-response"
         },
         {
-          "label": "4️⃣ Logistics Management",
+          "label": "5️⃣ Logistics Management",
           "value": "--test-logistics"
-        },
-        {
-          "label": "5️⃣ Knowledge Query",
-          "value": "--test-knowledge-query"
         },
         {
           "label": "6️⃣ Full Retail Day",

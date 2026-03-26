@@ -134,17 +134,16 @@ def scene0(t):
     - 15.0s: Scene ends, store fully open
     """
     buffer = new_buf()
-    dawn = t / 15.0  # normalized 0-1 over 15 seconds
+    dawn = t / 15  # normalized 0-1 over 15 seconds
 
     # Calculate when sun reaches peak height
-    sun_peak_t = 13.9
-    stars_visible = t < sun_peak_t
+    sun_peak_t = 10
 
     # Stars
     star_cols = [6, 14, 22, 34, 46, 58, canvas_width-8, canvas_width-2]
     for i, sc in enumerate(star_cols):
         sr = i % 3
-        if stars_visible and sc < canvas_width:
+        if sc < canvas_width:
             put(buffer, sr, sc, '+', D())
 
     # Moon (moves right, visible until t=11s or so)
@@ -153,16 +152,17 @@ def scene0(t):
         put(buffer, 0, mx, '( )', D())
 
     # Sun (rises vertically, arcs horizontally from right to center)
-    if dawn > 0.2:  # appears after ~3 seconds
+    if dawn > 0:  # appears after ~0 seconds
         sy = int(clamp(6 - t * 0.36, 1, 6))
         sx = int(clamp(canvas_width - 12 - t * 0.5, canvas_width//2, canvas_width - 12))
-        put(buffer, sy,     sx,     '\\|/', Y())
-        put(buffer, sy + 1, sx - 2, '--(O)--', Y())
-        put(buffer, sy + 2, sx,     '/|\\', Y())
+        put(buffer, sy,     sx,     '\\ | /', Y())
+        put(buffer, sy + 1, sx - 2, '  --(O)--', Y())
+        put(buffer, sy + 2, sx,     '/ | \\', Y())
 
     # Ground
     ground = canvas_height - 2
     hline(buffer, ground, 0, canvas_width-1, '_', D())
+    hline(buffer, ground +1, 0, canvas_width-1, '_', D())
 
     # Store — centred, roof at row 2, walls all the way to ground
     store_w  = 35
@@ -186,7 +186,7 @@ def scene0(t):
     top_row_light_frame = window_start_t + (num_win_rows_early - 1) * row_interval
     
     # Building name turns green when top row of windows light up (synchronized)
-    put(buffer, roof_row+1, sx2, '| A C M E   R E T A I L   C O R P |',
+    put(buffer, roof_row+1, sx2, '|       A C M E   R E T A I L     |',
         G() if t >= top_row_light_frame else W_())
     put(buffer, roof_row+2, sx2, '+'+'-'*(store_w-2)+'+', W_())
 
@@ -250,8 +250,6 @@ def scene0(t):
     mn = str(int((t % 5) * 12)).zfill(2)
     put(buffer, 0, 0, f' {hr}:{mn} AM ', C())
 
-    msg = ' [ Scene 1: Store Opening ]  Order Fulfillment tests starting...'
-    put(buffer, canvas_height-1, 0, msg[:canvas_width], G())
     return buffer
 
 # ---------------------------------------------------------------------------
@@ -270,13 +268,15 @@ def scene1(t):
 
     # Ground
     hline(buffer, ground, 0, canvas_width-1, '_', D())
+    hline(buffer, ground +1, 0, canvas_width-1, '_', D())
+
     
     # Sun at fixed position (same as end of scene0)
-    sy = int(clamp(6 - 15 * 0.36, 1, 6))
-    sx = int(clamp(canvas_width - 12 - 15 * 0.5, canvas_width//2, canvas_width - 12))
-    put(buffer, sy,     sx,     '\\|/', Y())
-    put(buffer, sy + 1, sx - 2, '--(O)--', Y())
-    put(buffer, sy + 2, sx,     '/|\\', Y())
+    sy = int(clamp(6 - 10 * 0.36, 1, 6))
+    sx = int(clamp(canvas_width - 12 - 10 * 0.5, canvas_width//2, canvas_width - 12))
+    put(buffer, sy,     sx,     '\\ | /', Y())
+    put(buffer, sy + 1, sx - 2, '  --(O)--', Y())
+    put(buffer, sy + 2, sx,     '/ | \\', Y())
 
     # ── Identical store from scene0 ──────────────
     store_w    = 35
@@ -285,7 +285,7 @@ def scene1(t):
     right_wall = sx2 + store_w - 1
 
     put(buffer, roof_row,   sx2, ','+'-'*(store_w-2)+'.', W_())
-    put(buffer, roof_row+1, sx2, '| A C M E   R E T A I L   C O R P |', G())
+    put(buffer, roof_row+1, sx2, '|       A C M E   R E T A I L     |', G())
     put(buffer, roof_row+2, sx2, '+'+'-'*(store_w-2)+'+', W_())
     for row in range(roof_row+3, ground):
         put(buffer, row, sx2,        '|', W_())
@@ -325,8 +325,8 @@ def scene1(t):
     put(buffer, door_top+3, door_col, '[      ]', G())
     put(buffer, door_top+4, door_col, '[______]', G())
 
-    # ── Order board — fades in after t=4 seconds ────────────────────────
-    if t > 4:
+    # ── Order board — fades in after t=1 seconds ────────────────────────
+    if t > 1:
         box_w = 34
         box_x = 2
         put(buffer, 0, box_x, '+' + '-'*box_w + '+', B())
@@ -346,7 +346,7 @@ def scene1(t):
             put(buffer, 3+i, box_x+len(line), status, st_cp)
             put(buffer, 3+i, box_x + box_w + 1, '|', B())
         confirmed = sum(1 for *_,d in orows if d)
-        footer = f'| Confirmed: {confirmed}/3    Pending: {3-confirmed}/3'
+        footer = f'| Confirmed: {confirmed}/3   Pending: {3-confirmed}/3'
         put(buffer, 6, box_x, footer.ljust(box_w), B())
         put(buffer, 6, box_x + box_w + 1, '|', B())
         put(buffer, 7, box_x, '+' + '-'*box_w + '+', B())
@@ -354,9 +354,9 @@ def scene1(t):
     # ── Shoppers walk from left toward the store entrance ─────────────────
     max_x  = sx2 - 2
     shoppers = [
-        dict(bx=-2,  spd=3.3, oid='ORD-001', tot='$299', appear_delay=3),
-        dict(bx=-18, spd=2.7, oid='ORD-002', tot='$849', appear_delay=3),
-        dict(bx=-36, spd=2.1, oid='ORD-005', tot='$549', appear_delay=3),
+        dict(bx=-2,  spd=3.3, oid='ORD-001', tot='$299', appear_delay=0),
+        dict(bx=-22, spd=3.3, oid='ORD-002', tot='$849', appear_delay=1),
+        dict(bx=-42, spd=3.3, oid='ORD-005', tot='$549', appear_delay=2),
     ]
     walk = (int(t / 1.2)) % 2  # convert to frame-like cadence based on time
     for s in shoppers:
@@ -384,12 +384,10 @@ def scene1(t):
         time_since_appear = t - appear_frame
         if time_since_appear > s['appear_delay'] and sx >= 0 and r_head >= 6:
             bx2 = clamp(sx - 2, 2, sx - 2)
-            put(buffer, r_head-5, bx2, '.-----------------.', W_())
-            put(buffer, r_head-4, bx2, '| '+s['oid']+'  '+s['tot']+'   |', G())
-            put(buffer, r_head-3, bx2, "'-----------------'", W_())
+            put(buffer, r_head-5, bx2, '.---------------.', W_())
+            put(buffer, r_head-4, bx2, '| '+s['oid']+'  '+s['tot']+' |', G())
+            put(buffer, r_head-3, bx2, "'---------------'", W_())
 
-    msg = ' [ Scene 2: Customers Arriving ]  Validating order pipeline...'
-    put(buffer, canvas_height-1, 0, msg[:canvas_width], G())
     return buffer
 
 # ---------------------------------------------------------------------------
@@ -435,7 +433,7 @@ def scene2(t, state=None):
         else:
             tablet_color = R()
             tablet_qty = ' 0 '
-            tablet_status = '!!!'
+            tablet_status = 'OUT OF STOCK'
             tablet_fill = 0
     else:
         tablet_color = G()
@@ -455,7 +453,7 @@ def scene2(t, state=None):
     for sr, sc2, name, qty, st, fill, cp in shelves:
         if sc2 + shelf_w >= canvas_width or sc2 < 0: continue
         
-        put(buffer, sr,   sc2, '+-' + '-'*(shelf_w-2) + '-+', cp)
+        put(buffer, sr,   sc2, '+-' + '-'*(shelf_w-4) + '-+', cp)
         header = f'| {name:<30} {qty:>4}'
         put(buffer, sr+1, sc2, header, cp)
         put(buffer, sr+1, sc2 + shelf_w - 1, '|', cp)
@@ -467,7 +465,7 @@ def scene2(t, state=None):
         put(buffer, sr+3, sc2, bar_row, cp)
         put(buffer, sr+3, sc2 + shelf_w - 1, '|', cp)
         put(buffer, sr+4, sc2, '|' + '-'*(shelf_w-2) + '|', D())
-        put(buffer, sr+5, sc2, '+-' + '-'*(shelf_w-2) + '-+', cp)
+        put(buffer, sr+5, sc2, '+-' + '-'*(shelf_w-4) + '-+', cp)
 
     # Forklift journey with complete lifecycle
     floor_r = canvas_height - 3
@@ -550,10 +548,10 @@ def scene2(t, state=None):
             put(buffer, fork_row+1, fx-5, '=====', Y())
         if carrying and t >= 15 and fx - 8 >= 0:
             box_row = int(fork_row - 1)
-            put(buffer, box_row,     fx-8, '+-----+', C())
+            put(buffer, box_row+2,   fx-8, '+-----+', C())
             put(buffer, box_row+1,   fx-8, '|_____|', C())
-            put(buffer, box_row+2,   fx-8, '|-----|', C())
-            put(buffer, box_row+3,   fx-8, '+-----+', C())
+            put(buffer, box_row,   fx-8, '|-----|', C())
+            put(buffer, box_row-1,   fx-8, '+-----+', C())
     else:
         for mr in range(floor_r-3, floor_r):
             put(buffer, mr, fx+4, '|=|', Y())
@@ -567,10 +565,10 @@ def scene2(t, state=None):
             put(buffer, fork_row+1, fx+7, '=====', Y())
         if carrying and t >= 15 and fx + 10 < canvas_width:
             box_row = int(fork_row - 1)
-            put(buffer, box_row,     fx+10, '+-----+', C())
-            put(buffer, box_row+1,   fx+10, '|_____|', C())
-            put(buffer, box_row+2,   fx+10, '|-----|', C())
-            put(buffer, box_row+3,   fx+10, '+-----+', C())
+            put(buffer, box_row+2,   fx+8, '+-----+', C())
+            put(buffer, box_row+1,   fx+8, '|_____|', C())
+            put(buffer, box_row,     fx+8, '|-----|', C())
+            put(buffer, box_row-1,   fx+8, '+-----+', C())
 
     # Out-of-stock alert and truck collision
     alert_w = min(42, canvas_width - 2)
@@ -578,8 +576,8 @@ def scene2(t, state=None):
     alert_right_edge = alert_col + alert_w
     
     truck_w = 13
-    success_duration = 1.5  # seconds
-    truck_speed = 7
+    success_duration = 6  # seconds
+    truck_speed = 5
     
     # Alert appears at t=20s (after forklift picks up box)
     if t > 20:
@@ -623,9 +621,9 @@ def scene2(t, state=None):
         
         if tx < canvas_width - 2:
             put(buffer, 14, tx, '+===========+', Y())
-            put(buffer, 15, tx, '| RESTOCK!  |', Y())
-            put(buffer, 16, tx, '| +50 TBLT  |', Y())
-            put(buffer, 17, tx, '+--O-----O--+', Y())
+            put(buffer, 15, tx, '|  RESTOCK  |-\\', Y())
+            put(buffer, 16, tx, '|  -------  |--|-|', Y())
+            put(buffer, 17, tx, '+--O---------O+--]', Y())
             if tx < canvas_width//2 + 4:
                 put(buffer, 14, tx+13, 'ARRIVED!', G())
                 put(buffer, 15, tx+13, '+50 units', G())
@@ -634,8 +632,6 @@ def scene2(t, state=None):
     ground = canvas_height - 2
     hline(buffer, ground, 0, canvas_width-1, '_', D())
 
-    msg = ' [ Scene 3: Warehouse Ops ]  Inventory Management checks running...'
-    put(buffer, canvas_height-1, 0, msg[:canvas_width], G())
     return buffer
 
 # ---------------------------------------------------------------------------
@@ -666,15 +662,15 @@ def scene3(t):
 
     # Scrolling scenery
     scenery = [
-        (5,  [(2,' /\\ ',D()), (3,'/__\\',D())]),
-        (22, [(2,'+--+',D()), (3,'|HQ|',D()), (4,'+--+',D())]),
-        (int(canvas_width*0.55), [(2,' /\\ ',D()), (3,'/__\\',D())]),
-        (int(canvas_width*0.8),  [(2,'+--+',D()), (3,'|  |',D()), (4,'+--+',D())]),
+        (30,  [(2,' /\\ ',D()), (3,'/__\\',D()),(4,'/__\\',D()),(5,'/__\\',D()),(6,' ||',D())]),
+        (85,  [(2,' /\\ ',D()), (3,'/__\\',D()),(4,'/__\\',D()),(5,'/__\\',D()),(6,' ||',D())]),
+        (100,  [(2,' /\\ ',D()), (3,'/__\\',D()),(4,'/__\\',D()),(5,'/__\\',D()),(6,' ||',D())]),
+        (150, [(2,'+===O==O==O==O===+',D()),(3,'||              ||',D()),(4,'||  EDA  RULEZ  ||',D()),(5,'||              ||',D()),(6,'+================+',D()),(7,'   |         |   ',D())])
     ]
     for bx, rows in scenery:
         sx = (bx - scroll % canvas_width + canvas_width*3) % canvas_width
         for dr, ch, cp in rows:
-            if sx < canvas_width-4:
+            if sx + len(ch) < canvas_width:  # Check that entire string fits
                 put(buffer, dr, sx, ch, cp)
 
     # Road rows
@@ -711,15 +707,14 @@ def scene3(t):
     tcl = G() if phase == 'repaired' else Y()
     truck_top = road_top - 4
     put(buffer, truck_top,   tx, '+------------------+  +---+', Y())
-    put(buffer, truck_top+1, tx, '|  ACME LOGISTICS  |  |>  |', Y())
-    put(buffer, truck_top+2, tx, '|  ORD-005  $549   |  |   |', Y())
-    put(buffer, truck_top+3, tx, '+------------------+--+---+', tcl)
-
+    put(buffer, truck_top+1, tx, '|  ACME LOGISTICS  |  |>|__\\', Y())
+    put(buffer, truck_top+2, tx, '|  ORD-005  $549   |_ | --===|', Y())
+    put(buffer, truck_top+3, tx, '+------------------+--+------|+', tcl)
     tire_ok = phase in ('rolling', 'repaired')
     put(buffer, road_top, tx+2,  '(O)', Y())
-    put(buffer, road_top, tx+8,  '(O)' if tire_ok else '(_)', Y() if tire_ok else R())
-    put(buffer, road_top, tx+14, '(O)', Y())
-    put(buffer, road_top, tx+18, '(O)', Y())
+    put(buffer, road_top, tx+9, '(O)', Y())
+    put(buffer, road_top, tx+16,  '(O)' if tire_ok else '(__)', Y() if tire_ok else R())
+    put(buffer, road_top, tx+23, '(O)', Y())
 
     if phase == 'rolling':
         for p in range(3):
@@ -732,19 +727,19 @@ def scene3(t):
     if phase in ('wobble', 'flat'):
         bang_time = t - 20  # time since wobble started
         
-        if bang_time < 9.0:  # BANG visible for 9 seconds (~2 second animation cycle)
+        if bang_time < 8.0:  # BANG visible for 9 seconds (~2 second animation cycle)
             bang_col = tx + truck_w // 2 - 8
             bang_row = truck_top - 12
             
             flash_fast = int(bang_time * 2) % 2  # alternate every 0.5 seconds
             
-            put(buffer, bang_row,     bang_col, '╔═══════════════╗', R())
-            put(buffer, bang_row + 1, bang_col, '║               ║', R() if flash_fast == 0 else Y())
-            put(buffer, bang_row + 2, bang_col, '║   ***   ***   ║', R() if flash_fast == 0 else Y())
-            put(buffer, bang_row + 3, bang_col, '║    B A N G    ║', R() if flash_fast == 0 else Y())
-            put(buffer, bang_row + 4, bang_col, '║   ***   ***   ║', R() if flash_fast == 0 else Y())
+            put(buffer, bang_row + 4, bang_col, '╔═══════════════╗', R())
             put(buffer, bang_row + 5, bang_col, '║               ║', R() if flash_fast == 0 else Y())
-            put(buffer, bang_row + 6, bang_col, '╚═══════════════╝', R())
+            put(buffer, bang_row + 6, bang_col, '║   *** * ***   ║', R() if flash_fast == 0 else Y())
+            put(buffer, bang_row + 7, bang_col, '║ *  B A N G  * ║', R() if flash_fast == 0 else Y())
+            put(buffer, bang_row + 8, bang_col, '║   *** * ***   ║', R() if flash_fast == 0 else Y())
+            put(buffer, bang_row + 9, bang_col, '║               ║', R() if flash_fast == 0 else Y())
+            put(buffer, bang_row + 10, bang_col, '╚═══════════════╝', R())
 
     # ───── FLAT TIRE PHASE ─────
     if phase == 'flat':
@@ -754,23 +749,23 @@ def scene3(t):
             box_col = tx + truck_w // 2 - box_w // 2
             box_top = truck_top - 14
             
-            put(buffer, box_top,     box_col, '+' + '-'*box_w + '+', R())
-            put(buffer, box_top + 1, box_col, ('| !! SHIPMENT DELAY INCIDENT CREATED !!').ljust(box_w+1) + '|', R())
-            put(buffer, box_top + 2, box_col, ('| SHIP-2026-0048  flat tire  Hwy 101').ljust(box_w+1) + '|', R())
-            put(buffer, box_top + 3, box_col, ('| INC created  ETA +2d  team notified').ljust(box_w+1) + '|', R())
-            put(buffer, box_top + 4, box_col, '+' + '-'*box_w + '+', R())
+            put(buffer, box_top + 5,     box_col, '+' + '-'*box_w + '+', R())
+            put(buffer, box_top + 6, box_col, ('| !! SHIPMENT DELAY INCIDENT CREATED !!').ljust(box_w+3) + '|', R())
+            put(buffer, box_top + 7, box_col, ('| SHIP-2026-0048  flat tire  Hwy 101').ljust(box_w+3) + '|', R())
+            put(buffer, box_top + 8, box_col, ('| INC created  ETA +2d  team notified').ljust(box_w+3) + '|', R())
+            put(buffer, box_top + 9, box_col, '+' + '-'*box_w + '+', R())
         
         # Mechanic arrives and fixes (from t > 33s onwards)
         if t > 33:
             mx2 = tx + truck_w - 2
             mf  = int((t / 0.8) % 2)  # convert to time-based frame oscillation
-            put(buffer, truck_top+1, mx2, ' o ',             W_())
-            put(buffer, truck_top+2, mx2, '/|\\' if mf else ' |/', W_())
-            put(buffer, truck_top+3, mx2, ' | ',             W_())
-            put(buffer, truck_top+3, mx2, ' /\\ ',             W_())
-            if t > 38:
-                put(buffer, truck_top+2, mx2+5, ['-0','/0','|0','\\0'][int((t-40)*2) % 4], Y())
-                put(buffer, truck_top+1, mx2+6, 'fixing', D())
+            put(buffer, truck_top+4, mx2, ' o ',             W_())
+            put(buffer, truck_top+5, mx2, '/|\\' if mf else '\| ', W_())
+            put(buffer, truck_top+6, mx2, ' | ',             W_())
+            put(buffer, truck_top+7, mx2, '/ \\ ',             W_())
+            if t > 36:
+                put(buffer, truck_top+2, mx2+14, ['-','/','|','\\'][int((t-40)*2) % 4], Y())
+                put(buffer, truck_top+1, mx2+12, 'fixing', D())
 
     if phase == 'repaired':
         for p in range(min(int(t-60), 4)):
@@ -784,14 +779,12 @@ def scene3(t):
         box_col = stationary_tx + truck_w // 2 - box_w // 2
         box_top = truck_top - 14
         
-        put(buffer, box_top,     box_col, '+' + '-'*box_w + '+', G())
-        put(buffer, box_top + 1, box_col, ('| >> Tire replaced! Back on the road.').ljust(box_w+1) + '|', G())
-        put(buffer, box_top + 2, box_col, ('| SHIP-2026-0048  in_transit  ETA updated').ljust(box_w+1) + '|', G())
-        put(buffer, box_top + 3, box_col, ('| Customer notified via SMS + email').ljust(box_w+1) + '|', G())
-        put(buffer, box_top + 4, box_col, '+' + '-'*box_w + '+', G())
+        put(buffer, box_top + 5,     box_col, '+' + '-'*box_w + '+', G())
+        put(buffer, box_top + 6, box_col, ('| >> Tire replaced! Back on the road.').ljust(box_w+3) + '|', G())
+        put(buffer, box_top + 7, box_col, ('| SHIP-2026-0048  in_transit  ETA updated').ljust(box_w+3) + '|', G())
+        put(buffer, box_top + 8, box_col, ('| Customer notified via SMS + email').ljust(box_w+3) + '|', G())
+        put(buffer, box_top + 9, box_col, '+' + '-'*box_w + '+', G())
 
-    msg = ' [ Scene 4: Logistics ]  Incident Response checks running...'
-    put(buffer, canvas_height-1, 0, msg[:canvas_width], G())
     return buffer
 
 # ---------------------------------------------------------------------------
@@ -919,14 +912,6 @@ def scene4(t, suites_done):
     put(buffer, stand_y + 1, stand_center - 1, '║', D())
     put(buffer, stand_y + 2, stand_center - 5, '══════════', D())
     
-    all_done = len(suites_done) >= len(SUITES)
-    if all_done and t > 10:
-        all_pass = all(p for _, p in suites_done)
-        msg = ' *** ALL TESTS PASSED  --  Grade: A+  --  Retail Day Complete! *** '
-        put(buffer, canvas_height-1, center_column(len(msg)), msg[:canvas_width], G() if all_pass else R())
-    else:
-        msg = ' [ Scene 5: Command Center ]  Verifying full system...'
-        put(buffer, canvas_height-1, 0, msg[:canvas_width], G())
     return buffer
 
 # ---------------------------------------------------------------------------
@@ -943,7 +928,7 @@ class State:
         self.truck_collision_t = None
 
 # Scene durations in seconds
-SCENE_DURATION = [15.0, 36.0, 52.0, 80.0, 35.0]
+SCENE_DURATION = [10.0, 30.0, 53.0, 80.0, 35.0]
 
 def get_buf(state):
     """Get buffer for current scene based on elapsed time."""
@@ -964,12 +949,47 @@ def get_buf(state):
     return scene4((elapsed - sum(SCENE_DURATION)) % SCENE_DURATION[4], state.suites_done)
 
 # ---------------------------------------------------------------------------
+# SCENE MESSAGE — drawn below the canvas
+# ---------------------------------------------------------------------------
+SCENE_MESSAGES = [
+    ' [ Scene 1: Store Opening ]  Order Fulfillment tests starting...',
+    ' [ Scene 2: Customers Arriving ]  Validating order pipeline...',
+    ' [ Scene 3: Warehouse Ops ]  Inventory Management checks running...',
+    ' [ Scene 4: Logistics ]  Incident Response checks running...',
+    ' [ Scene 5: Command Center ]  Verifying full system...',
+]
+
+def draw_scene_message(stdscr, state, scr_h, scr_w):
+    """Draw the scene title message one row below the canvas."""
+    elapsed = (time.time() - state.start_time) * PLAYBACK_SPEED
+    
+    # Determine which scene we're in
+    acc = 0
+    scene_idx = 0
+    for i, scene_dur in enumerate(SCENE_DURATION):
+        if elapsed < acc + scene_dur:
+            scene_idx = i
+            break
+        acc += scene_dur
+    else:
+        # Loop last scene
+        scene_idx = len(SCENE_DURATION) - 1
+    
+    msg_row = canvas_row_offset + canvas_height + 1
+    if msg_row < scr_h - 4:  # Leave room for status bar
+        try:
+            msg = SCENE_MESSAGES[scene_idx]
+            stdscr.addstr(msg_row, 0, msg[:scr_w], curses.color_pair(G()))
+        except (curses.error, IndexError):
+            pass
+
+# ---------------------------------------------------------------------------
 # STATUS BAR  drawn below the canvas
 # ---------------------------------------------------------------------------
 SPIN = ['|', '/', '-', '\\']
 
 def draw_status(stdscr, state, scr_h, scr_w):
-    base  = canvas_row_offset + canvas_height
+    base  = canvas_row_offset + canvas_height + 3
     total = len(SUITES)
     done  = len(state.suites_done)
 
@@ -1056,7 +1076,7 @@ def curses_main(stdscr):
     while True:
         # Recalculate canvas size every frame so resizing works live
         scr_h, scr_w = stdscr.getmaxyx()
-        status_rows  = 5
+        status_rows  = 6  # scene message + 5 status bar rows
 
         canvas_width = max(MIN_CANVAS_WIDTH, scr_w - 2)
         canvas_height = max(MIN_CANVAS_HEIGHT, scr_h - status_rows - 1)
@@ -1083,6 +1103,7 @@ def curses_main(stdscr):
         stdscr.erase()
         buffer = get_buf(state)
         render(stdscr, buffer)
+        draw_scene_message(stdscr, state, scr_h, scr_w)
         draw_status(stdscr, state, scr_h, scr_w)
         stdscr.refresh()
 

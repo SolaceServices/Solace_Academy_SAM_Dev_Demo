@@ -16,7 +16,7 @@
     {
       "label": "Simulate Events",
       "type": "shell",
-      "command": "bash ./run-scenario.sh --submit-for-evaluation",
+      "command": "bash ./run-scenario.sh ${input:eventScenario}",
       "options": {
         "cwd": "/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/scripts"
       },

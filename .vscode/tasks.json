@@ -16,7 +16,7 @@
     {
       "label": "Simulate Events",
       "type": "shell",
-      "command": "bash ./run-scenario.sh ${input:eventScenario}",
+      "command": "bash ./run-scenario.sh --submit-for-evaluation",
       "options": {
         "cwd": "/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/scripts"
       },
@@ -29,13 +29,15 @@
     {
       "label": "Submit My Work",
       "type": "shell",
-      "command": "bash ./grade.sh",
+      "command": "/workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents/sam/.venv/bin/python3 evaluate_project.py",
       "options": {
-        "cwd": "/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/scripts"
+        "cwd": "/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/grading/tests"
       },
       "presentation": {
         "reveal": "always",
-        "panel": "dedicated"
+        "panel": "dedicated",
+        "clear": true,
+        "focus": true
       }
     }
   ],
@@ -99,10 +101,6 @@
         {
           "label": "5️⃣ Logistics Management",
           "value": "--test-logistics"
-        },
-        {
-          "label": "6️⃣ Full Retail Day",
-          "value": "--scenario full-day"
         }
       ]
     }

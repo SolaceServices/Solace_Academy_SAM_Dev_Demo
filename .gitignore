@@ -26,3 +26,6 @@ CLAUDE.md
 # Python cache
 **/__pycache__/
 **/*.pyc
+
+#Test Results
+test_results.xml

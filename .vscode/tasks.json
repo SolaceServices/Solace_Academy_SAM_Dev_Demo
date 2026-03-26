@@ -33,6 +33,7 @@
       "options": {
         "cwd": "/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/grading/tests"
       },
+      "problemMatcher": [],
       "presentation": {
         "reveal": "always",
         "panel": "dedicated",

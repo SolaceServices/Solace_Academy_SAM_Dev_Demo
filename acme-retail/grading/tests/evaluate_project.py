@@ -22,6 +22,14 @@ SUITES = [
 VENV_PYTHON = '/workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents/sam/.venv/bin/python3'
 DEMO_MODE   = True   # set False to run real tests
 
+# Frame timing configuration
+FRAME_DURATION = 0.033  # seconds per frame (change this to adjust visual smoothness)
+# 0.22 = 4.5 fps, 0.11 = 9 fps, 0.067 = 15 fps, 0.033 = 30 fps
+
+# Animation playback speed multiplier (independent of frame rate)
+# 1.0 = normal speed, 2.0 = 2x speed, 0.5 = half speed
+PLAYBACK_SPEED = 4.0
+
 EVQ = queue.Queue()
 
 # ---------------------------------------------------------------------------
@@ -31,7 +39,7 @@ def run_tests():
     if DEMO_MODE:
         for name, _, checks in SUITES:
             EVQ.put({'type': 'suite_start', 'name': name, 'checks': checks})
-            time.sleep(checks * 0.9)
+            time.sleep(checks * 0.45)  # adjust demo timing proportionally
             EVQ.put({'type': 'suite_done', 'name': name, 'passed': True})
         EVQ.put({'type': 'all_done'})
         return
@@ -118,12 +126,17 @@ def center_column(width):
 # SCENE 0  Night to day, store opens
 # ---------------------------------------------------------------------------
 def scene0(t):
+    """
+    Scene 0 timeline (in seconds):
+    - 0.0s: Stars visible, moon moving right
+    - 3.3s: Sun appears
+    - 13.9s: Sun peaks (top-left corner)
+    - 15.0s: Scene ends, store fully open
+    """
     buffer = new_buf()
-    dawn = t / 15.0  # 2x faster dawn progression (was 30.0)
+    dawn = t / 15.0  # normalized 0-1 over 15 seconds
 
     # Calculate when sun reaches peak height
-    # Sun rises: sy = clamp(6 - int(t * 0.36), 1, 6)
-    # Peak is when sy = 1, which happens at: 6 - int(t * 0.36) = 1 → t ≈ 13.9
     sun_peak_t = 13.9
     stars_visible = t < sun_peak_t
 
@@ -134,15 +147,15 @@ def scene0(t):
         if stars_visible and sc < canvas_width:
             put(buffer, sr, sc, '+', D())
 
-    # Moon
+    # Moon (moves right, visible until t=11s or so)
     if dawn < 0.5:
-        mx = clamp(canvas_width - 8 - t * 4, 2, canvas_width - 8)  # 2x faster (was t * 2)
+        mx = int(clamp(canvas_width - 8 - t * 4, 2, canvas_width - 8))
         put(buffer, 0, mx, '( )', D())
 
-    # Sun
-    if dawn > 0.2:
-        sy = clamp(6 - int(t * 0.36), 1, 6)  # rise vertically
-        sx = clamp(canvas_width - 12 - int(t * 0.5), canvas_width//2, canvas_width - 12)  # arc horizontally from right to center
+    # Sun (rises vertically, arcs horizontally from right to center)
+    if dawn > 0.2:  # appears after ~3 seconds
+        sy = int(clamp(6 - t * 0.36, 1, 6))
+        sx = int(clamp(canvas_width - 12 - t * 0.5, canvas_width//2, canvas_width - 12))
         put(buffer, sy,     sx,     '\\|/', Y())
         put(buffer, sy + 1, sx - 2, '--(O)--', Y())
         put(buffer, sy + 2, sx,     '/|\\', Y())
@@ -160,14 +173,13 @@ def scene0(t):
     # Roof
     put(buffer, roof_row,   sx2, ','+'-'*(store_w-2)+'.', W_())
     
-    # Calculate top row light frame early so we can use it for all synchronized events
-    # Windows light up bottom-to-top starting at t=5
-    # Each row lights up with 2-frame intervals (~0.44 seconds)
-    # With 4 rows max: frames 5, 7, 9, 11 — all complete before Scene 0 ends at frame 15
-    window_start_t = 5
-    row_interval = 1  # frames between each row lighting up (1 frame ≈ 0.22 seconds, ~0.3s feel)
+    # Windows light up bottom-to-top starting at t=5s
+    # Each row lights up with 2-frame intervals (~0.22 seconds per frame, so 2 frames = 0.44s feel)
+    # With 4 rows max: times 5s, 5.44s, 5.88s, 6.32s — all complete before scene ends at 15s
+    window_start_t = 5.0  # seconds
+    row_interval = 0.44  # seconds between each row lighting up
+    
     # We need num_win_rows to calculate top_row_light_frame
-    # Calculate it early before rendering anything
     inner_w   = store_w - 2
     building_rows_early = ground - (roof_row + 3)
     num_win_rows_early = max(1, (building_rows_early - 2) // 4)
@@ -184,29 +196,23 @@ def scene0(t):
         put(buffer, row, right_wall, '|', W_())
 
     # Windows — fill building height dynamically, 2 rows of windows if tall enough
-    # Each window block is 3 rows tall, with 1 gap row between blocks
-    # Windows centred inside store: margin=4, 4 wins spaced 7 apart
     n_wins    = 4
     win_w     = 3
     win_gap   = 4
-    win_span  = n_wins * win_w + (n_wins - 1) * win_gap  # 24
-    win_off   = 1 + (inner_w - win_span) // 2            # left margin inside walls
+    win_span  = n_wins * win_w + (n_wins - 1) * win_gap
+    win_off   = 1 + (inner_w - win_span) // 2
     win_cols  = [sx2 + win_off + i*(win_w+win_gap) for i in range(n_wins)]
-    win_start = roof_row + 3   # first window row starts here
-    win_block = 4              # 3 rows per window + 1 gap below
-    num_win_rows = num_win_rows_early  # Use the value calculated earlier
+    win_start = roof_row + 3
+    win_block = 4
+    num_win_rows = num_win_rows_early
     
     for wr in range(num_win_rows):
         row0 = win_start + wr * win_block
-        # Only render if there's room (don't let windows overlap with door/sign area)
         if row0 + 2 >= ground - 5:
-            continue  # Skip this row if it overlaps with door area
+            continue
         
-        # Calculate which row from the bottom this is (0 = bottom, 1 = above, etc.)
         row_from_bottom = (num_win_rows - 1) - wr
-        # Time when this row should light up (in frames)
         row_light_frame = window_start_t + row_from_bottom * row_interval
-        # This row lights up when t >= row_light_frame
         row_lit = t >= row_light_frame
         
         for wi, wc in enumerate(win_cols):
@@ -217,7 +223,6 @@ def scene0(t):
             put(buffer, row0+2, wc, '+-+', cp)
 
     # OPEN FOR BUSINESS sign — appears when top row of windows light up
-    # (synchronized with building name color change and door opening)
     if t >= top_row_light_frame:
         sign_row = ground - 6
         if sign_row > win_start:
@@ -226,7 +231,6 @@ def scene0(t):
             put(buffer, sign_row, sign_col, sign, G())
 
     # Door — clean, 4 rows, centred on store, sits at ground
-    # Door opens at the same time as building name turns green and sign appears
     door_top = ground - 4
     door_col = sx2 + store_w//2 - 3
     if t < top_row_light_frame:
@@ -242,8 +246,8 @@ def scene0(t):
         put(buffer, door_top+3, door_col, '[      ]', G())
         put(buffer, door_top+4, door_col, '[______]', G())
 
-    hr = 6 + t // 5
-    mn = str((t % 5) * 12).zfill(2)
+    hr = 6 + int(t // 5)
+    mn = str(int((t % 5) * 12)).zfill(2)
     put(buffer, 0, 0, f' {hr}:{mn} AM ', C())
 
     msg = ' [ Scene 1: Store Opening ]  Order Fulfillment tests starting...'
@@ -254,20 +258,27 @@ def scene0(t):
 # SCENE 1  Same store as scene0 — order board fades in, shoppers arrive
 # ---------------------------------------------------------------------------
 def scene1(t):
+    """
+    Scene 1 timeline (in seconds):
+    - 0.0s: Order board appears (after 4s delay from scene start = 19s total)
+    - 3.0s: First shopper starts appearing
+    - 12.0s: Last shopper starts appearing
+    - 36.0s: Scene ends
+    """
     buffer = new_buf()
     ground = canvas_height - 2
 
     # Ground
     hline(buffer, ground, 0, canvas_width-1, '_', D())
     
-    # Sun at fixed position (same as end of scene0 at t=15)
-    sy = clamp(6 - int(15 * 0.36), 1, 6)
-    sx = clamp(canvas_width - 12 - int(15 * 0.5), canvas_width//2, canvas_width - 12)
+    # Sun at fixed position (same as end of scene0)
+    sy = int(clamp(6 - 15 * 0.36, 1, 6))
+    sx = int(clamp(canvas_width - 12 - 15 * 0.5, canvas_width//2, canvas_width - 12))
     put(buffer, sy,     sx,     '\\|/', Y())
     put(buffer, sy + 1, sx - 2, '--(O)--', Y())
     put(buffer, sy + 2, sx,     '/|\\', Y())
 
-    # ── Identical store from scene0 (centred, full height) ──────────────
+    # ── Identical store from scene0 ──────────────
     store_w    = 35
     sx2        = center_column(store_w)
     roof_row   = 2
@@ -280,7 +291,7 @@ def scene1(t):
         put(buffer, row, sx2,        '|', W_())
         put(buffer, row, right_wall, '|', W_())
 
-    # Windows — same centred formula
+    # Windows — all lit
     inner_w   = store_w - 2
     n_wins, win_w, win_gap = 4, 3, 4
     win_span  = n_wins*win_w + (n_wins-1)*win_gap
@@ -314,7 +325,7 @@ def scene1(t):
     put(buffer, door_top+3, door_col, '[      ]', G())
     put(buffer, door_top+4, door_col, '[______]', G())
 
-    # ── Order board — fades in top-left after t=4 ────────────────────────
+    # ── Order board — fades in after t=4 seconds ────────────────────────
     if t > 4:
         box_w = 34
         box_x = 2
@@ -340,15 +351,14 @@ def scene1(t):
         put(buffer, 6, box_x + box_w + 1, '|', B())
         put(buffer, 7, box_x, '+' + '-'*box_w + '+', B())
 
-# ── Shoppers walk from left toward the store entrance ─────────────────
-    # max_x: stop just before the left wall of the store
+    # ── Shoppers walk from left toward the store entrance ─────────────────
     max_x  = sx2 - 2
     shoppers = [
         dict(bx=-2,  spd=3.3, oid='ORD-001', tot='$299', appear_delay=3),
         dict(bx=-18, spd=2.7, oid='ORD-002', tot='$849', appear_delay=3),
         dict(bx=-36, spd=2.1, oid='ORD-005', tot='$549', appear_delay=3),
     ]
-    walk = (t//4) % 2
+    walk = (int(t / 1.2)) % 2  # convert to frame-like cadence based on time
     for s in shoppers:
         sx = int(s['bx'] + t*s['spd'])
         if sx > max_x or sx + 10 < 0:
@@ -369,7 +379,7 @@ def scene1(t):
         if r_head >= 0 and 0 <= sx < canvas_width-2:
             put(buffer, r_legs, sx, leg_str, W_())
 
-# Speech bubble — appears 3 seconds after shopper arrives, 3 lines above head
+        # Speech bubble — appears after delay
         appear_frame = -s['bx'] / s['spd']
         time_since_appear = t - appear_frame
         if time_since_appear > s['appear_delay'] and sx >= 0 and r_head >= 6:
@@ -386,36 +396,48 @@ def scene1(t):
 # SCENE 2  Warehouse + forklift + restock truck
 # ---------------------------------------------------------------------------
 def scene2(t, state=None):
+    """
+    Scene 2 timeline (in seconds):
+    - 0.0s: Forklift starts at center
+    - 10.0s: Forklift reaches left shelf
+    - 15.0s: Forklift picks up box, raises forks
+    - 20.0s: Forklift lowers forks with box
+    - 28.0s: Forklift repositioned toward right
+    - 36.0s: Forklift raises box on right shelf
+    - 40.0s: Box disappears, forks lower
+    - 44.0s: Forklift turns around
+    - 52.0s: Scene ends
+    
+    Truck timeline:
+    - 24.0s: Truck appears from right
+    - Collision when truck reaches alert box
+    - Success window: 1.5 seconds
+    """
     buffer = new_buf()
     put(buffer, 0, 0, (' WAREHOUSE WH-A | San Francisco, CA | 65% capacity')[:canvas_width], W_())
     hline(buffer, 1, 0, canvas_width-1, '=', D())
 
-    # Two columns of shelves — spread evenly across terminal, larger and more detailed
+    # Two columns of shelves
     left_col = 1
     right_col = canvas_width - 40
     
-    # Calculate vertical spacing to centre middle shelf
     top_row = 2
     mid_row = canvas_height // 2 - 4
     bot_row = canvas_height - 11
     
-    # Determine Pro Tablet 12 shelf color and state based on timeline
+    # Determine Pro Tablet 12 shelf color based on timeline
     if state.truck_collision_t is None:
-        # Before truck collision
         if t < 15:
-            # Initially yellow (low stock)
             tablet_color = Y()
             tablet_qty = ' 8 '
             tablet_status = 'LOW'
             tablet_fill = 2
         else:
-            # After forklift picks it up: turn red (out of stock)
             tablet_color = R()
             tablet_qty = ' 0 '
             tablet_status = '!!!'
             tablet_fill = 0
     else:
-        # After truck collision: turn green (restocked)
         tablet_color = G()
         tablet_qty = '50 '
         tablet_status = 'OK '
@@ -433,109 +455,99 @@ def scene2(t, state=None):
     for sr, sc2, name, qty, st, fill, cp in shelves:
         if sc2 + shelf_w >= canvas_width or sc2 < 0: continue
         
-        # Top border
         put(buffer, sr,   sc2, '+-' + '-'*(shelf_w-2) + '-+', cp)
-        # Header row with product name
         header = f'| {name:<30} {qty:>4}'
         put(buffer, sr+1, sc2, header, cp)
         put(buffer, sr+1, sc2 + shelf_w - 1, '|', cp)
-        # Status row
         status_txt = f'| Status: [{st:^3}]' + ' '*(shelf_w-15)
         put(buffer, sr+2, sc2, status_txt, W_())
         put(buffer, sr+2, sc2 + shelf_w - 1, '|', W_())
-        # Stock bar
         bar = '#'*fill + ' '*(10-fill)
         bar_row = f'| Stock: [{bar}]' + ' '*(shelf_w-16)
         put(buffer, sr+3, sc2, bar_row, cp)
         put(buffer, sr+3, sc2 + shelf_w - 1, '|', cp)
-        # Divider
         put(buffer, sr+4, sc2, '|' + '-'*(shelf_w-2) + '|', D())
-        # Bottom border
         put(buffer, sr+5, sc2, '+-' + '-'*(shelf_w-2) + '-+', cp)
 
     # Forklift journey with complete lifecycle
     floor_r = canvas_height - 3
-    shelf_w = 38  # shelf width (matches shelf definition above)
-    under_shelf_x = left_col + shelf_w  # position at bottom right corner of bottom left shelf
+    shelf_w = 38
+    under_shelf_x = left_col + shelf_w
     start_x = canvas_width // 2
-    right_deposit_x = right_col  # position at bottom left corner of bottom right shelf
+    right_deposit_x = right_col
     
-    # Expanded timeline for complete forklift lifecycle
+    # Expanded timeline for complete forklift lifecycle (in seconds)
     if t < 10:
-        # Phase 1: Move from start to left shelf (0-10)
+        # Phase 1: Move from start to left shelf (0-10s)
         progress = t / 10.0
         fx = int(start_x - (start_x - under_shelf_x) * progress)
         carrying = False
-        lh = 0  # forks down
+        lh = 0
         mirrored = False
     elif t < 15:
-        # Phase 2: Raise forks, box appears (10-15)
+        # Phase 2: Raise forks, box appears (10-15s)
         fx = under_shelf_x
         carrying = True
-        lh = ((t - 10) / 5.0) * 2  # raise from 0 to 2 over 5 frames
+        lh = ((t - 10) / 5.0) * 2
         mirrored = False
     elif t < 20:
-        # Phase 3: Lower forks fully with box still visible (15-20)
+        # Phase 3: Lower forks fully (15-20s)
         fx = under_shelf_x
         carrying = True
-        lh = max(0, 2 - ((t - 15) / 5.0) * 2)  # lower from 2 to 0
+        lh = max(0, 2 - ((t - 15) / 5.0) * 2)
         mirrored = False
     elif t < 28:
-        # Phase 4: Back up, turn around (mirror), move toward center (20-28)
+        # Phase 4: Back up, turn around (20-28s)
         progress = (t - 20) / 8.0
         fx = int(under_shelf_x + (start_x - under_shelf_x) * progress)
         carrying = True
-        lh = 0  # forks stay down during backup/turn
-        mirrored = True  # flip to face right
+        lh = 0
+        mirrored = True
     elif t < 36:
-        # Phase 5: Move right toward right shelf (28-36)
+        # Phase 5: Move right (28-36s)
         progress = (t - 28) / 8.0
         fx = int(start_x + (right_deposit_x - start_x) * progress)
         carrying = True
-        lh = 0  # forks down while moving
-        mirrored = True  # still facing right
+        lh = 0
+        mirrored = True
     elif t < 40:
-        # Phase 6: Raise forks with box (36-40)
+        # Phase 6: Raise forks (36-40s)
         fx = right_deposit_x
         carrying = True
-        lh = ((t - 36) / 4.0) * 2  # raise from 0 to 2
+        lh = ((t - 36) / 4.0) * 2
         mirrored = True
     elif t < 44:
-        # Phase 7: Box disappears, forks lower (40-44)
+        # Phase 7: Box disappears, forks lower (40-44s)
         fx = right_deposit_x
-        carrying = False  # box disappears
-        lh = max(0, 2 - ((t - 40) / 4.0) * 2)  # lower from 2 to 0
+        carrying = False
+        lh = max(0, 2 - ((t - 40) / 4.0) * 2)
         mirrored = True
     elif t < 52:
-        # Phase 8: Turn around (mirror back), move toward start (44-52)
+        # Phase 8: Turn around, move toward start (44-52s)
         progress = (t - 44) / 8.0
         fx = int(right_deposit_x - (right_deposit_x - start_x) * progress)
         carrying = False
-        lh = 0  # forks down
-        mirrored = False  # flip back to face left
+        lh = 0
+        mirrored = False
     else:
-        # Phase 9: Idle at start (52+)
+        # Phase 9: Idle at start (52+s)
         fx = start_x
         carrying = False
         lh = 0
         mirrored = False
 
-    # Cab with butt extension — mirrored based on direction
+    # Cab with forks — mirrored based on direction
     if not mirrored:
-        # Mast — 4 rows tall above floor (facing left)
         for mr in range(floor_r-3, floor_r):
             put(buffer, mr, fx, '|=|', Y())
         put(buffer, floor_r-2, fx, '|o|~~~|', Y())
         put(buffer, floor_r-1, fx, '|_|~~~|', Y())
-        # Wheels — front pair at mast, rear pair at butt
         put(buffer, floor_r, fx, 'O O', Y())
         put(buffer, floor_r, fx+4, 'O O', Y())
-        # Forks extend left
-        fork_row = int((floor_r - 1) - lh)
+        fork_row = int((floor_r - 1) - int(lh))
         if fx - 5 >= 0:
             put(buffer, fork_row,   fx-5, '=====', Y())
             put(buffer, fork_row+1, fx-5, '=====', Y())
-        # Box on left forks - appears when forks reach full height, stays until deposited
         if carrying and t >= 15 and fx - 8 >= 0:
             box_row = int(fork_row - 1)
             put(buffer, box_row,     fx-8, '+-----+', C())
@@ -543,21 +555,16 @@ def scene2(t, state=None):
             put(buffer, box_row+2,   fx-8, '|-----|', C())
             put(buffer, box_row+3,   fx-8, '+-----+', C())
     else:
-        # Mast — 4 rows tall above floor (facing right)
         for mr in range(floor_r-3, floor_r):
             put(buffer, mr, fx+4, '|=|', Y())
-        # Mirrored: facing right
         put(buffer, floor_r-2, fx, '|~~~|o|', Y())
         put(buffer, floor_r-1, fx, '|~~~|_|', Y())
-        # Wheels — same positioning as non-mirrored
         put(buffer, floor_r, fx, 'O O', Y())
         put(buffer, floor_r, fx+4, 'O O', Y())
-        # Forks extend right from the cab
-        fork_row = int((floor_r - 1) - lh)
+        fork_row = int((floor_r - 1) - int(lh))
         if fx + 7 < canvas_width:
             put(buffer, fork_row,   fx+7, '=====', Y())
             put(buffer, fork_row+1, fx+7, '=====', Y())
-        # Box on right forks - appears when forks reach full height, stays until deposited
         if carrying and t >= 15 and fx + 10 < canvas_width:
             box_row = int(fork_row - 1)
             put(buffer, box_row,     fx+10, '+-----+', C())
@@ -565,31 +572,26 @@ def scene2(t, state=None):
             put(buffer, box_row+2,   fx+10, '|-----|', C())
             put(buffer, box_row+3,   fx+10, '+-----+', C())
 
-    # Out-of-stock alert (replaces lower shelves when triggered)
+    # Out-of-stock alert and truck collision
     alert_w = min(42, canvas_width - 2)
     alert_col = center_column(alert_w)
-    alert_right_edge = alert_col + alert_w  # right edge of the alert box
+    alert_right_edge = alert_col + alert_w
     
-    # Restock truck rolls in from the right starting at t=11 (same time as alert)
-    truck_w = 13  # truck width
-    success_duration = 1.5 * (1.0 / 0.22)  # 1.5 seconds in frames (at 0.22s per frame) — shortened from 3
-    truck_speed = 7  # faster exit speed
+    truck_w = 13
+    success_duration = 1.5  # seconds
+    truck_speed = 7
     
-    # Alert appears at t=20 (after forklift has picked up box from left shelf)
+    # Alert appears at t=20s (after forklift picks up box)
     if t > 20:
-        # Check if we should show the alert
         if state.truck_collision_t is None:
-            # No collision yet: show red alert
             alert_color = R()
             alert_text = '| !! Pro Tablet 12 OUT OF STOCK !!'
             extra_text = '| INC-2026-015 created  >> ESCALATING'
         elif (t - state.truck_collision_t) < success_duration:
-            # During success window: show green success message
             alert_color = G()
             alert_text = '| Pro Tablet 12 back in stock √'
             extra_text = '| Restock shipment received'
         else:
-            # After success window: hide alert entirely
             alert_color = None
         
         if alert_color is not None:
@@ -598,37 +600,27 @@ def scene2(t, state=None):
             put(buffer, 16, alert_col, (extra_text).ljust(alert_w+1) + '|', alert_color)
             put(buffer, 17, alert_col, '+' + '-'*alert_w + '+', alert_color)
     
-    # Restock truck appears at t=24 (later arrival), starts far right
+    # Restock truck appears at t=24s
     if t > 24:
-        # Calculate truck position: comes from right moving left at consistent speed
         tx_raw = canvas_width - 5 - (t - 24) * truck_speed
         truck_left_edge = int(tx_raw)
         
-        # Check collision: truck's left edge reaches alert box's right edge
         if truck_left_edge <= alert_right_edge and state.truck_collision_t is None:
             state.truck_collision_t = t
         
-        # Truck movement logic
         if state.truck_collision_t is None:
-            # Before collision: truck moving left (from right) at consistent speed
             tx = int(canvas_width - 5 - (t - 24) * truck_speed)
         elif (t - state.truck_collision_t) < success_duration:
-            # During success window: truck pauses at collision point (stops at alert edge)
             tx = int(alert_right_edge)
         else:
-            # After success window: truck reverses and exits right at consistent speed
             time_exiting = t - state.truck_collision_t - success_duration
             tx = int(alert_right_edge + time_exiting * truck_speed)
         
-        # DO NOT clamp tx — let it go off-screen
-        
-        # Track when truck completely exits screen (left edge goes past right edge)
         truck_completely_off_screen = tx >= canvas_width
         if truck_completely_off_screen and state.truck_collision_t is not None:
             if not hasattr(state, 'truck_exit_t'):
                 state.truck_exit_t = t
         
-        # Only draw truck if it's still visible on screen
         if tx < canvas_width - 2:
             put(buffer, 14, tx, '+===========+', Y())
             put(buffer, 15, tx, '| RESTOCK!  |', Y())
@@ -650,18 +642,27 @@ def scene2(t, state=None):
 # SCENE 3  Truck + flat tire + mechanic
 # ---------------------------------------------------------------------------
 def scene3(t):
+    """
+    Scene 3 timeline (in seconds):
+    - 0.0s: Truck accelerating
+    - 20.0s: Tire starts to fail (wobble begins)
+    - 24.0s: Tire blows, BANG animation starts
+    - ~26.4s: Road freezes
+    - 28.0s: Incident message appears (after BANG)
+    - 33.0s: Mechanic arrives
+    - 60.0s: Repair complete, truck exits
+    - 80.0s: Scene ends
+    """
     buffer = new_buf()
     put(buffer, 0, 0, (' Highway 101 | ORD-005 Lisa Wang | Chicago IL | 11:45 AM')[:canvas_width], C())
     hline(buffer, 1, 0, canvas_width-1, '=', D())
 
-    # Road scrolling — stops 0.5 seconds after tire blows (t=24)
-    # Tire blows at t=24, stop at t=24 + (0.5s / 0.22s per frame) ≈ t=26.3
-    # Round to t=26 for clean cutoff
-    if t < 26:
+    # Road scrolling — stops 0.5 seconds after tire blows (t=24s)
+    road_freeze_t = 26.4  # ~0.5s after t=24
+    if t < road_freeze_t:
         scroll = int(t * 1.5)
     else:
-        # Road frozen after tire blow
-        scroll = int(24 * 1.5)  # 36
+        scroll = int(24 * 1.5)
 
     # Scrolling scenery
     scenery = [
@@ -687,23 +688,23 @@ def scene3(t):
     hline(buffer, road_top+2, 0, canvas_width-1, '=', D())
     hline(buffer, road_top+3, 0, canvas_width-1, '_', D())
 
-    # Truck phases — revised timeline
+    # Truck phases — time-based timeline
     truck_w = 24
     if t < 20:
-        # Phase 1: Accelerate to center (0-20) — FASTER
-        tx = clamp(int(t*3.5), 0, canvas_width//2 - truck_w)
+        # Phase 1: Accelerate to center (0-20s)
+        tx = int(clamp(t*3.5, 0, canvas_width//2 - truck_w))
         phase = 'rolling'
     elif t < 24:
-        # Phase 2: Wobble as tire fails (20-24)
-        tx = canvas_width//2 - truck_w + int(math.sin((t-20)*3.5)*2)
+        # Phase 2: Wobble as tire fails (20-24s)
+        tx = int(canvas_width//2 - truck_w + math.sin((t-20)*3.5)*2)
         phase = 'wobble'
     elif t < 60:
-        # Phase 3: Flat tire / skidding / repair (24-60) — extended for longer mechanic animation
-        tx = canvas_width//2 - truck_w + 2
+        # Phase 3: Flat tire / skidding / repair (24-60s)
+        tx = int(canvas_width//2 - truck_w + 2)
         phase = 'flat'
     else:
-        # Phase 4: Repaired and driving off (60+) — faster exit, allow off-screen
-        tx = canvas_width//2 - truck_w + 2 + (t-60)*6
+        # Phase 4: Repaired and driving off (60+s)
+        tx = int(canvas_width//2 - truck_w + 2 + (t-60)*6)
         phase = 'repaired'
     tx = clamp(tx, 0, canvas_width - truck_w - 2) if phase != 'repaired' else tx
 
@@ -727,22 +728,16 @@ def scene3(t):
                 put(buffer, truck_top, ex, '~', D())
         put(buffer, truck_top-1, tx+2, '>> cruising... all nominal <<', D())
 
-    if phase == 'wobble':
-        pass
-
-    # ───── BANG ANIMATION (appears at tire color change t=20, visible for 2 seconds) ─────
+    # ───── BANG ANIMATION (visible for 2 seconds starting at t=24) ─────
     if phase in ('wobble', 'flat'):
-        bang_frame = int(t - 20)  # 0+ after t=20 (when tire color changes)
+        bang_time = t - 20  # time since wobble started
         
-        if bang_frame < 9:  # BANG visible for 9 frames (~2 seconds at 0.22s per frame)
-            # Create dramatic BANG art (larger)
-            bang_col = tx + truck_w // 2 - 8  # center above truck
+        if bang_time < 9.0:  # BANG visible for 9 seconds (~2 second animation cycle)
+            bang_col = tx + truck_w // 2 - 8
             bang_row = truck_top - 12
             
-            # Faster color flashing - alternate every frame
-            flash_fast = bang_frame % 2  # alternates 0, 1, 0, 1, 0, 1...
+            flash_fast = int(bang_time * 2) % 2  # alternate every 0.5 seconds
             
-            # Draw larger BANG box (17 chars wide, 7 tall) — BANG only in middle
             put(buffer, bang_row,     bang_col, '╔═══════════════╗', R())
             put(buffer, bang_row + 1, bang_col, '║               ║', R() if flash_fast == 0 else Y())
             put(buffer, bang_row + 2, bang_col, '║   ***   ***   ║', R() if flash_fast == 0 else Y())
@@ -753,11 +748,11 @@ def scene3(t):
 
     # ───── FLAT TIRE PHASE ─────
     if phase == 'flat':
-        # Incident alert box — appears AFTER BANG ends (t=20 + 9 frames = t=29, show at t=29+)
-        if t > 28:  # Wait for BANG to completely finish before showing message
+        # Incident alert box — appears after BANG ends (t > 28s)
+        if t > 28:
             box_w = 44
-            box_col = tx + truck_w // 2 - box_w // 2  # center on truck during flat phase
-            box_top = truck_top - 14  # higher to clear BANG animation
+            box_col = tx + truck_w // 2 - box_w // 2
+            box_top = truck_top - 14
             
             put(buffer, box_top,     box_col, '+' + '-'*box_w + '+', R())
             put(buffer, box_top + 1, box_col, ('| !! SHIPMENT DELAY INCIDENT CREATED !!').ljust(box_w+1) + '|', R())
@@ -765,28 +760,27 @@ def scene3(t):
             put(buffer, box_top + 3, box_col, ('| INC created  ETA +2d  team notified').ljust(box_w+1) + '|', R())
             put(buffer, box_top + 4, box_col, '+' + '-'*box_w + '+', R())
         
-        # Mechanic arrives and fixes (from t=34 onwards, after message settles)
+        # Mechanic arrives and fixes (from t > 33s onwards)
         if t > 33:
             mx2 = tx + truck_w - 2
-            mf  = (t//3) % 2
+            mf  = int((t / 0.8) % 2)  # convert to time-based frame oscillation
             put(buffer, truck_top+1, mx2, ' o ',             W_())
             put(buffer, truck_top+2, mx2, '/|\\' if mf else ' |/', W_())
             put(buffer, truck_top+3, mx2, ' | ',             W_())
             put(buffer, truck_top+3, mx2, ' /\\ ',             W_())
             if t > 38:
-                put(buffer, truck_top+2, mx2+5, ['-0','/0','|0','\\0'][(t-40)%4], Y())
+                put(buffer, truck_top+2, mx2+5, ['-0','/0','|0','\\0'][int((t-40)*2) % 4], Y())
                 put(buffer, truck_top+1, mx2+6, 'fixing', D())
 
     if phase == 'repaired':
-        for p in range(min(t-60, 4)):
+        for p in range(min(int(t-60), 4)):
             ex = tx - p*3
             if ex >= 0:
                 put(buffer, truck_top, ex, '~', D())
         
-        # Repaired message box — stationary after truck leaves
-        # Keep it at the position where it was centered during flat phase
+        # Repaired message box
         box_w = 44
-        stationary_tx = canvas_width//2 - truck_w  # truck position when it stops
+        stationary_tx = canvas_width//2 - truck_w
         box_col = stationary_tx + truck_w // 2 - box_w // 2
         box_top = truck_top - 14
         
@@ -804,23 +798,26 @@ def scene3(t):
 # SCENE 4  Command centre
 # ---------------------------------------------------------------------------
 def scene4(t, suites_done):
+    """
+    Scene 4 timeline (in seconds):
+    - 0.0s: Command center displayed
+    - 10.0s: Tests completing
+    - 35.0s: Scene ends
+    """
     buffer = new_buf()
     title = '[ ACME COMMAND CENTER  |  SAM v1.18.9 ]'
     put(buffer, 0, center_column(len(title)), title, W_())
     hline(buffer, 1, 0, canvas_width-1, '=', W_())
 
     # Desktop Monitor Frame
-    # Calculate monitor dimensions — larger 16:9 aspect ratio
     monitor_content_w = 80
-    monitor_total_w   = monitor_content_w + 4  # 2-char bezel on each side
+    monitor_total_w   = monitor_content_w + 4
     monitor_x         = center_column(monitor_total_w)
     monitor_y         = 2
     
-    # Monitor top bezel and screen edge
     put(buffer, monitor_y, monitor_x, '╔' + '═'*(monitor_content_w + 2) + '╗', D())
     put(buffer, monitor_y + 1, monitor_x, '║' + ' '*(monitor_content_w + 2) + '║', D())
     
-    # Screen content area starts at monitor_y + 2
     screen_y = monitor_y + 2
     screen_x = monitor_x + 1
     
@@ -840,7 +837,11 @@ def scene4(t, suites_done):
         ('LogisticsAgent    ', 'acme/logistics/* ', '5 active '),
         ('NotificationSvc   ', 'acme/notify/*    ', '42/day  '),
     ]
-    pulse = '(*)' if (t % 8 < 4) else '( )'
+    
+    # Pulse animation: period of 4 seconds (8 frames in original, now 4s total)
+    pulse_phase = (t % 4.0) / 4.0  # 0-1 over 4 seconds
+    pulse = '(*)' if pulse_phase < 0.5 else '( )'
+    
     for i, (aname, topic, detail) in enumerate(agents):
         done   = i < len(suites_done)
         ac     = G() if done else C()
@@ -851,7 +852,6 @@ def scene4(t, suites_done):
         row_num = screen_y + 3 + i
         put(buffer, row_num, screen_x, '│', B())
         
-        # Draw content with fixed spacing aligned to the right edge
         col = screen_x + 1
         put(buffer, row_num, col, f' {pk} ', ac)
         col += 4
@@ -863,7 +863,6 @@ def scene4(t, suites_done):
         col += 12
         put(buffer, row_num, col, res, res_cp)
         
-        # Right border at fixed position
         put(buffer, row_num, screen_x + monitor_content_w + 1, '│', B())
 
     # Divider after agents
@@ -890,10 +889,9 @@ def scene4(t, suites_done):
         ('acme/customer/notified     ', 'OrderFulfillment'),
     ]
     
-    # Show 10 events max (much taller monitor)
     max_event_rows = min(10, canvas_height - evts_header_y - 10)
     for i in range(max_event_rows):
-        idx    = (t // 3 + i) % len(evts)
+        idx    = (int(t / 1.5) + i) % len(evts)  # scroll events every 1.5 seconds
         et, ea = evts[idx]
         age_cp = G() if i == 0 else D()
         
@@ -913,13 +911,11 @@ def scene4(t, suites_done):
     put(buffer, screen_bottom + 1, monitor_x, '║' + ' '*(monitor_content_w + 2) + '║', D())
     put(buffer, screen_bottom + 2, monitor_x, '╠' + '═'*(monitor_content_w + 2) + '╣', D())
     
-    # Monitor stand (upside-down T)
+    # Monitor stand
     stand_center = monitor_x + monitor_total_w // 2
     stand_y = screen_bottom + 3
     
-    # Top bar of T
     put(buffer, stand_y,     stand_center - 3, '══════', D())
-    # Vertical post
     put(buffer, stand_y + 1, stand_center - 1, '║', D())
     put(buffer, stand_y + 2, stand_center - 5, '══════════', D())
     
@@ -939,38 +935,51 @@ def scene4(t, suites_done):
 class State:
     def __init__(self):
         self.tick              = 0
+        self.start_time        = time.time()
         self.suites_done       = []
         self.active_name       = None
         self.active_chks       = 0
         self.all_done          = False
-        self.truck_collision_t = None  # tracks when truck collides with alert box
+        self.truck_collision_t = None
 
-SCENE_LEN = [15, 36, 52, 80, 35]
+# Scene durations in seconds
+SCENE_DURATION = [15.0, 36.0, 52.0, 80.0, 35.0]
 
 def get_buf(state):
-    t, acc = state.tick, 0
+    """Get buffer for current scene based on elapsed time."""
+    # Calculate elapsed time in seconds, scaled by playback speed
+    elapsed = (time.time() - state.start_time) * PLAYBACK_SPEED
+    
+    acc = 0
     fns = [scene0, scene1, lambda lt: scene2(lt, state), scene3,
            lambda lt: scene4(lt, state.suites_done)]
-    for i, slen in enumerate(SCENE_LEN):
-        if t < acc + slen:
-            return fns[i](t - acc)
-        acc += slen
-    return scene4((t - sum(SCENE_LEN)) % SCENE_LEN[4], state.suites_done)
+    
+    for i, scene_dur in enumerate(SCENE_DURATION):
+        if elapsed < acc + scene_dur:
+            # We're in scene i
+            return fns[i](elapsed - acc)
+        acc += scene_dur
+    
+    # Loop the last scene
+    return scene4((elapsed - sum(SCENE_DURATION)) % SCENE_DURATION[4], state.suites_done)
 
 # ---------------------------------------------------------------------------
 # STATUS BAR  drawn below the canvas
 # ---------------------------------------------------------------------------
 SPIN = ['|', '/', '-', '\\']
 
-def draw_status(stdscr, state, si, scr_h, scr_w):
-    base  = canvas_row_offset + canvas_height   # first row below the centred canvas
+def draw_status(stdscr, state, scr_h, scr_w):
+    base  = canvas_row_offset + canvas_height
     total = len(SUITES)
     done  = len(state.suites_done)
 
     if base + 3 >= scr_h:
         return
 
-    spin_ch = SPIN[si % 4] if not state.all_done else '*'
+    # Spinner with 1 second period (scaled by playback speed)
+    spin_phase = ((time.time() - state.start_time) * PLAYBACK_SPEED) % 1.0
+    spin_idx = int(spin_phase / 0.25)  # 4 frames per second for spinner
+    spin_ch = SPIN[spin_idx % 4] if not state.all_done else '*'
     spin_cp = curses.color_pair(G()) if not state.all_done else \
               curses.color_pair(Y()) | curses.A_BOLD
     active  = state.active_name or ('All done!' if state.all_done else 'Starting...')
@@ -1041,22 +1050,19 @@ def curses_main(stdscr):
     stdscr.keypad(True)
 
     state = State()
-    si    = 0
 
     threading.Thread(target=run_tests, daemon=True).start()
 
     while True:
-        # ── Recalculate canvas size every frame so resizing works live ──
+        # Recalculate canvas size every frame so resizing works live
         scr_h, scr_w = stdscr.getmaxyx()
-        status_rows  = 5   # rows reserved for status bar below canvas
+        status_rows  = 5
 
-        # Canvas fills as much of the terminal as possible
         canvas_width = max(MIN_CANVAS_WIDTH, scr_w - 2)
         canvas_height = max(MIN_CANVAS_HEIGHT, scr_h - status_rows - 1)
 
-        # Centre the canvas
         canvas_col_offset = max(0, (scr_w - canvas_width) // 2)
-        canvas_row_offset = 0   # pin to top; status bar goes below
+        canvas_row_offset = 0
 
         # Drain event queue
         try:
@@ -1077,18 +1083,16 @@ def curses_main(stdscr):
         stdscr.erase()
         buffer = get_buf(state)
         render(stdscr, buffer)
-        draw_status(stdscr, state, si, scr_h, scr_w)
+        draw_status(stdscr, state, scr_h, scr_w)
         stdscr.refresh()
 
         if stdscr.getch() in (ord('q'), ord('Q'), 27):
             break
-        if state.all_done and state.tick > sum(SCENE_LEN) + 40:
+        if state.all_done and ((time.time() - state.start_time) * PLAYBACK_SPEED) > sum(SCENE_DURATION) + 40:
             time.sleep(1.5)
             break
 
-        si         += 1
-        state.tick += 1
-        time.sleep(0.22)   # ~4.5 fps — slow enough to read
+        time.sleep(FRAME_DURATION)
 
 # ---------------------------------------------------------------------------
 # ENTRY POINT

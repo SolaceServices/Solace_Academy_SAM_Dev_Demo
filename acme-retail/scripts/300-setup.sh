@@ -171,6 +171,16 @@ cp /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/mcp-servers/mcp_postgres_
 # Point the webui gateway at PostgreSQL to avoid SQLite concurrent-write lock errors
 export WEB_UI_GATEWAY_DATABASE_URL="postgresql://acme:acme@localhost:5432/sam_gateway"
 
+# Create /tmp/inventory-reports if InventoryManagementAgent exists
+# (MCP filesystem server requires this directory to exist at startup)
+if [ -f "$SAM_DIR/configs/agents/inventory_management_agent_agent.yaml" ] && \
+   [ -f "$SAM_DIR/configs/gateways/acme-inventory-events.yaml" ]; then
+  if [ ! -d "/tmp/inventory-reports" ]; then
+    echo "📁 Creating /tmp/inventory-reports for InventoryManagementAgent MCP filesystem tool..."
+    mkdir -p /tmp/inventory-reports
+  fi
+fi
+
 # Print URL once the UI is reachable
 echo "⏳ Loading UI..."
 set +m

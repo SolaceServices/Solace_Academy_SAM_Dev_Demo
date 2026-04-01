@@ -183,7 +183,9 @@ if [ -f "$SAM_DIR/configs/agents/inventory_management_agent_agent.yaml" ] && \
 fi
 
 # Start LogisticsAgent (Strands-based external agent) if it exists
-if [ -d "$SAM_DIR/logistics_agent" ] && [ -f "$SAM_DIR/configs/agents/a2a.yaml" ]; then
+LOGISTICS_AGENT_DIR="/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/mcp-servers/logistics_agent"
+MCP_SERVERS_DIR="/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/mcp-servers"
+if [ -d "$LOGISTICS_AGENT_DIR" ] && [ -f "$SAM_DIR/configs/agents/a2a.yaml" ]; then
   echo "🚢 Starting LogisticsAgent (Strands)..."
   
   # Kill any existing LogisticsAgent processes
@@ -191,10 +193,10 @@ if [ -d "$SAM_DIR/logistics_agent" ] && [ -f "$SAM_DIR/configs/agents/a2a.yaml" 
   sleep 1
   
   # Ensure Strands dependencies are installed
-  if [ ! -f "$SAM_DIR/logistics_agent/.deps_installed" ]; then
+  if [ ! -f "$LOGISTICS_AGENT_DIR/.deps_installed" ]; then
     echo "📦 Installing Strands dependencies..."
     pip install strands-agents strands-agents-tools psycopg2-binary fastapi uvicorn pydantic anthropic boto3 >/dev/null 2>&1
-    touch "$SAM_DIR/logistics_agent/.deps_installed"
+    touch "$LOGISTICS_AGENT_DIR/.deps_installed"
   fi
   
   # Set environment variables for LogisticsAgent
@@ -204,9 +206,11 @@ if [ -d "$SAM_DIR/logistics_agent" ] && [ -f "$SAM_DIR/configs/agents/a2a.yaml" 
   export LLM_SERVICE_GENERAL_MODEL_NAME="${LLM_SERVICE_GENERAL_MODEL_NAME:-openai/vertex-claude-4-5-sonnet}"
   export ORDERS_DB_CONNECTION_STRING="${ORDERS_DB_CONNECTION_STRING:-postgresql://acme:acme@localhost:5432/orders}"
   
-  # Start LogisticsAgent in background
+  # Start LogisticsAgent in background (cd to mcp-servers parent dir for Python module resolution)
+  cd "$MCP_SERVERS_DIR"
   nohup python -m logistics_agent.server > "$SAM_DIR/logistics_agent.log" 2>&1 &
   LOGISTICS_PID=$!
+  cd "$SAM_DIR"  # Return to SAM_DIR
   
   # Wait for LogisticsAgent to be fully ready (health check)
   echo "⏳ Waiting for LogisticsAgent to be ready..."

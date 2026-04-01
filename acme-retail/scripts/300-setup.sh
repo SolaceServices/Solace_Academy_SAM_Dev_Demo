@@ -198,10 +198,10 @@ if [ -d "$SAM_DIR/logistics_agent" ] && [ -f "$SAM_DIR/configs/agents/a2a.yaml" 
   fi
   
   # Set environment variables for LogisticsAgent
-  export OPENAI_API_BASE="${LLM_SERVICE_ENDPOINT:-https://lite-llm.mymaas.net}"
-  export OPENAI_API_KEY="${LLM_SERVICE_API_KEY}"
-  export OPENAI_BASE_URL="${LLM_SERVICE_ENDPOINT:-https://lite-llm.mymaas.net}"
-  export OPENAI_MODEL_NAME="${OPENAI_MODEL_NAME:-vertex-claude-4-5-sonnet}"
+  # These are read by logistics_agent/agent.py's detect_and_configure_model() function
+  export LLM_SERVICE_ENDPOINT="${LLM_SERVICE_ENDPOINT:-https://lite-llm.mymaas.net}"
+  export LLM_SERVICE_API_KEY="${LLM_SERVICE_API_KEY}"
+  export LLM_SERVICE_GENERAL_MODEL_NAME="${LLM_SERVICE_GENERAL_MODEL_NAME:-openai/vertex-claude-4-5-sonnet}"
   export ORDERS_DB_CONNECTION_STRING="${ORDERS_DB_CONNECTION_STRING:-postgresql://acme:acme@localhost:5432/orders}"
   
   # Start LogisticsAgent in background

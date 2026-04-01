@@ -274,7 +274,7 @@ def run_tests(student_email="student@example.com"):
     )
     # Pre-condition check: verify HIGH_SEV_INCIDENT_ID is at 'investigating' before we attempt restock
     with results.test("t3_precondition_incident_investigating",
-                      label=f"Pre-condition: {HIGH_SEV_INCIDENT_ID} status='investigating' (from Test 1)"):
+                      label=f"Pre-condition: {HIGH_SEV_INCIDENT_ID} status='investigating' (seed incident)"):
         try:
             assert_field_equals("incidents", "incident_id", HIGH_SEV_INCIDENT_ID, "status", "investigating")
         except Exception as exc:

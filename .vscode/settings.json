@@ -3,6 +3,13 @@
   "files.autoSave": "afterDelay",
   "files.autoSaveDelay": 1000,
   "markdown.preview.doubleClickToSwitchToEditor": false,
+  // Silence LogisticsAgent port forwarding notifications
+  "remote.portsAttributes": {
+    "8100": {
+      "label": "LogisticsAgent",
+      "onAutoForward": "silent"
+    }
+  },
   // Task Buttons shown in the status bar at the bottom
   "VsCodeTaskButtons.showCounter": false,
   "VsCodeTaskButtons.tasks": [

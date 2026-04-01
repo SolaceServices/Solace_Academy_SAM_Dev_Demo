@@ -1,0 +1,10 @@
+{
+  "name": "acme-retail-infrastructure",
+  "version": "1.0.0",
+  "description": "Infrastructure components (MCP servers, external agents, docker-compose) for Acme Retail SAM demo",
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/server-filesystem": "^2026.1.14",
+    "@modelcontextprotocol/server-postgres": "^0.6.2"
+  }
+}

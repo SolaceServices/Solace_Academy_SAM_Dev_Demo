@@ -113,8 +113,14 @@ rm -f orchestrator.db orchestrator.db-shm orchestrator.db-wal \
     bash ../../.devcontainer/setup-broker.sh
   fi
 
-  # Start postgres container and seed db
-  docker compose up -d
+  # Stop and remove any existing containers (handles old docker-compose location)
+  echo "🧹 Cleaning up old infrastructure containers..."
+  docker stop 300-Agents-qdrant 300-Agents-postgres >/dev/null 2>&1 || true
+  docker rm 300-Agents-qdrant 300-Agents-postgres >/dev/null 2>&1 || true
+
+  # Start postgres and qdrant containers (from infrastructure directory)
+  echo "🚀 Starting infrastructure containers..."
+  docker compose -f /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/infrastructure/docker-compose.yaml up -d
 
   # Wait for postgres to be healthy before attempting any queries
   until docker exec 300-Agents-postgres pg_isready -U acme -d orders >/dev/null 2>&1; do
@@ -166,8 +172,16 @@ PYTHON
     echo "⚠️  Broker SEMP not reachable — skipping queue cleanup"
   fi
 
-# Copy custom read-write MCP postgres server next to node_modules so Node can resolve its imports
-cp /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/mcp-servers/mcp_postgres_rw.js "$SAM_DIR/mcp_postgres_rw.js"
+# Install MCP server dependencies in centralized infrastructure location
+INFRASTRUCTURE_DIR="/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/infrastructure"
+if [ ! -d "$INFRASTRUCTURE_DIR/node_modules" ]; then
+  echo "📦 Installing MCP server dependencies..."
+  cd "$INFRASTRUCTURE_DIR"
+  npm install
+  cd "$SAM_DIR"
+else
+  echo "📦 MCP server dependencies already installed (skipping)."
+fi
 
 # Point the webui gateway at PostgreSQL to avoid SQLite concurrent-write lock errors
 export WEB_UI_GATEWAY_DATABASE_URL="postgresql://acme:acme@localhost:5432/sam_gateway"
@@ -183,8 +197,7 @@ if [ -f "$SAM_DIR/configs/agents/inventory_management_agent_agent.yaml" ] && \
 fi
 
 # Start LogisticsAgent (Strands-based external agent) if it exists
-LOGISTICS_AGENT_DIR="/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/mcp-servers/logistics_agent"
-MCP_SERVERS_DIR="/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/mcp-servers"
+LOGISTICS_AGENT_DIR="$INFRASTRUCTURE_DIR/logistics_agent"
 if [ -d "$LOGISTICS_AGENT_DIR" ] && [ -f "$SAM_DIR/configs/agents/a2a.yaml" ]; then
   echo "🚢 Starting LogisticsAgent (Strands)..."
   
@@ -206,8 +219,8 @@ if [ -d "$LOGISTICS_AGENT_DIR" ] && [ -f "$SAM_DIR/configs/agents/a2a.yaml" ]; t
   export LLM_SERVICE_GENERAL_MODEL_NAME="${LLM_SERVICE_GENERAL_MODEL_NAME:-openai/vertex-claude-4-5-sonnet}"
   export ORDERS_DB_CONNECTION_STRING="${ORDERS_DB_CONNECTION_STRING:-postgresql://acme:acme@localhost:5432/orders}"
   
-  # Start LogisticsAgent in background (cd to mcp-servers parent dir for Python module resolution)
-  cd "$MCP_SERVERS_DIR"
+  # Start LogisticsAgent in background (cd to infrastructure dir for Python module resolution)
+  cd "$INFRASTRUCTURE_DIR"
   nohup python -m logistics_agent.server > "$SAM_DIR/logistics_agent.log" 2>&1 &
   LOGISTICS_PID=$!
   cd "$SAM_DIR"  # Return to SAM_DIR

@@ -25,6 +25,12 @@ FINAL_MASTER_GUIDE.md
 */sam/mcp_postgres_rw.js
 *deps_installed
 
+# Infrastructure (MCP servers, external agents, docker-compose)
+acme-retail/infrastructure/node_modules/
+acme-retail/infrastructure/package-lock.json
+acme-retail/infrastructure/logistics_agent/__pycache__/
+acme-retail/infrastructure/logistics_agent/.deps_installed
+
 # Python cache
 **/__pycache__/
 **/*.pyc

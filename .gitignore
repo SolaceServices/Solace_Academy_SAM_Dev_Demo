@@ -5,6 +5,7 @@
 
 # AI assistant context file
 CLAUDE.md
+FINAL_MASTER_GUIDE.md
 
 # SAM student-created configs (each student builds these themselves)
 */sam/configs/
@@ -22,6 +23,7 @@ CLAUDE.md
 */sam/src/
 */sam/.sam/
 */sam/mcp_postgres_rw.js
+*deps_installed
 
 # Python cache
 **/__pycache__/

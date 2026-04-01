@@ -155,7 +155,6 @@ def seed_orders(cur, data: dict):
 
     print("  ✓ orders + order_items seeded.")
 
-
 def seed_inventory(cur, data: dict):
     if not data:
         return
@@ -195,7 +194,6 @@ def seed_inventory(cur, data: dict):
         ))
 
     print("  ✓ inventory seeded.")
-
 
 def seed_shipments(cur, data: dict):
     if not data:
@@ -252,6 +250,57 @@ def seed_shipments(cur, data: dict):
 
     print("  ✓ shipments + shipment_events seeded.")
 
+def seed_carriers_and_routes(cur, data: dict):
+    if not data:
+        return
+    
+    carriers = data.get("carriers", [])
+    routes = data.get("routes", [])
+    
+    if carriers:
+        print(f"  Seeding {len(carriers)} carriers...")
+        cur.execute("DELETE FROM routes")  # Routes reference carriers
+        cur.execute("DELETE FROM carriers")
+        
+        for carrier in carriers:
+            cur.execute("""
+                INSERT INTO carriers (carrier_id, name, api_endpoint, active)
+                VALUES (%s, %s, %s, %s)
+            """, (
+                carrier.get("carrier_id"),
+                carrier.get("name"),
+                carrier.get("api_endpoint"),
+                carrier.get("active", True)
+            ))
+    
+    if routes:
+        print(f"  Seeding {len(routes)} routes...")
+        for route in routes:
+            origin = route.get("origin", "")
+            destination = route.get("destination", "")
+            
+            origin_city = origin.split(",")[0].strip() if "," in origin else origin
+            origin_state = origin.split(",")[1].strip()[:2] if "," in origin else ""
+            dest_city = destination.split(",")[0].strip() if "," in destination else destination
+            dest_state = destination.split(",")[1].strip()[:2] if "," in destination else ""
+            
+            cur.execute("""
+                INSERT INTO routes (
+                    route_id, origin_city, origin_state, destination_city,
+                    destination_state, typical_transit_days, distance_miles, primary_carrier_id
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                route.get("route_id"),
+                origin_city,
+                origin_state,
+                dest_city,
+                dest_state,
+                route.get("typical_transit_days"),
+                route.get("distance_miles"),
+                route.get("primary_carrier")
+            ))
+        
+        print("  ✓ carriers and routes seeded.")
 
 def seed_incidents(cur, data: dict):
     if not data:
@@ -297,12 +346,10 @@ def seed_incidents(cur, data: dict):
 
     print("  ✓ incidents + incident_items seeded.")
 
-
 def create_schema(cur):
-    """Drop and recreate all core tables to ensure schema is always up to date."""
-    # Drop in child-first order to respect foreign key constraints
+    """Drop and recreate all core tables..."""
     for table in ("incident_items", "shipment_events", "incidents",
-                  "shipments", "order_items", "inventory", "orders"):
+                  "shipments", "order_items", "inventory", "orders", "routes", "carriers"):
         cur.execute(f"DROP TABLE IF EXISTS {table} CASCADE")
 
     cur.execute("""
@@ -384,6 +431,28 @@ def create_schema(cur):
             estimated_delivery TEXT,
             actual_delivery   TEXT,
             cost              FLOAT
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE carriers (
+            carrier_id TEXT PRIMARY KEY,
+            name TEXT UNIQUE NOT NULL,
+            api_endpoint TEXT,
+            active BOOLEAN DEFAULT true,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE routes (
+            route_id TEXT PRIMARY KEY,
+            origin_city TEXT,
+            origin_state TEXT,
+            destination_city TEXT,
+            destination_state TEXT,
+            typical_transit_days INTEGER,
+            distance_miles INTEGER,
+            primary_carrier_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     cur.execute("""
@@ -472,6 +541,7 @@ def main():
         seed_inventory(cur, inventory_data)
         seed_shipments(cur, logistics_data)
         seed_incidents(cur, incidents_data)
+        seed_carriers_and_routes(cur, logistics_data)
 
         conn.commit()
 
@@ -480,6 +550,7 @@ def main():
             "orders", "order_items",
             "inventory",
             "shipments", "shipment_events",
+            "carriers", "routes",
             "incidents", "incident_items",
         ]
         for table in tables:

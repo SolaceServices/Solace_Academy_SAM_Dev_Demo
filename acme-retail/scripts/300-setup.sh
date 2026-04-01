@@ -89,10 +89,11 @@ fi
 PORT="$(get_port)"
 UI_URL="$(build_ui_url "$PORT")"
 
-# Restart-friendly: free common SAM ports (ignore errors)
-for p in 8000 8001 8443; do
+# Restart-friendly: free common SAM ports and kill LogisticsAgent (ignore errors)
+for p in 8000 8001 8443 8100; do
   fuser -k "${p}/tcp" >/dev/null 2>&1 || true
 done
+pkill -f "logistics_agent.server" >/dev/null 2>&1 || true
 
 # Clear stale SQLite session databases and WAL journal files
 echo "🧹 Clearing stale session databases..."
@@ -179,6 +180,53 @@ if [ -f "$SAM_DIR/configs/agents/inventory_management_agent_agent.yaml" ] && \
     echo "📁 Creating /tmp/inventory-reports for InventoryManagementAgent MCP filesystem tool..."
     mkdir -p /tmp/inventory-reports
   fi
+fi
+
+# Start LogisticsAgent (Strands-based external agent) if it exists
+if [ -d "$SAM_DIR/logistics_agent" ] && [ -f "$SAM_DIR/configs/agents/a2a.yaml" ]; then
+  echo "🚢 Starting LogisticsAgent (Strands)..."
+  
+  # Kill any existing LogisticsAgent processes
+  pkill -f "logistics_agent.server" >/dev/null 2>&1 || true
+  sleep 1
+  
+  # Ensure Strands dependencies are installed
+  if [ ! -f "$SAM_DIR/logistics_agent/.deps_installed" ]; then
+    echo "📦 Installing Strands dependencies..."
+    pip install strands-agents strands-agents-tools psycopg2-binary fastapi uvicorn pydantic anthropic boto3 >/dev/null 2>&1
+    touch "$SAM_DIR/logistics_agent/.deps_installed"
+  fi
+  
+  # Set environment variables for LogisticsAgent
+  export OPENAI_API_BASE="${LLM_SERVICE_ENDPOINT:-https://lite-llm.mymaas.net}"
+  export OPENAI_API_KEY="${LLM_SERVICE_API_KEY}"
+  export OPENAI_BASE_URL="${LLM_SERVICE_ENDPOINT:-https://lite-llm.mymaas.net}"
+  export OPENAI_MODEL_NAME="${OPENAI_MODEL_NAME:-vertex-claude-4-5-sonnet}"
+  export ORDERS_DB_CONNECTION_STRING="${ORDERS_DB_CONNECTION_STRING:-postgresql://acme:acme@localhost:5432/orders}"
+  
+  # Start LogisticsAgent in background
+  nohup python -m logistics_agent.server > "$SAM_DIR/logistics_agent.log" 2>&1 &
+  LOGISTICS_PID=$!
+  
+  # Wait for LogisticsAgent to be fully ready (health check)
+  echo "⏳ Waiting for LogisticsAgent to be ready..."
+  LOGISTICS_READY=false
+  for i in {1..30}; do
+    if curl -fsS "http://localhost:8100/health" >/dev/null 2>&1; then
+      LOGISTICS_READY=true
+      break
+    fi
+    sleep 1
+  done
+  
+  if [ "$LOGISTICS_READY" = true ]; then
+    echo "✅ LogisticsAgent ready (PID: $LOGISTICS_PID, port 8100)"
+  else
+    echo "⚠️  LogisticsAgent started but not responding on port 8100. Check $SAM_DIR/logistics_agent.log for details."
+    echo "   SAM will continue starting - the A2A proxy will discover it when ready."
+  fi
+else
+  echo "📦 LogisticsAgent not found (skipping)."
 fi
 
 # Print URL once the UI is reachable

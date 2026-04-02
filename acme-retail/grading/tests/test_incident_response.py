@@ -1,15 +1,17 @@
 """
 test_incident_response.py — Grading tests for the IncidentResponseAgent.
 
-Tests four event-driven scenarios covering the gateway's incident routing:
+Tests five event-driven scenarios covering the gateway's incident routing:
   1. Blocked order (new SKU)         → new inventory_shortage incident created + escalated to 'investigating'
   2. Validated order                 → no new incident created (deduplication works)
   3. Inventory restocked             → seed incident (INC-2026-015) moved from 'investigating' to 'monitoring'
   4. Inventory error received        → new system_error incident created in DB
+  5. Shipment delayed                → new shipment_delay incident created with severity='medium'
 
-Tests run sequentially after a single full_reset(). Tests 1 and 3 are independent:
+Tests run sequentially after a single full_reset(). Tests 1, 3, and 5 are independent:
   Test 1 creates a new incident for a fresh SKU (SKU-KEYBOARD-101).
   Test 3 uses the pre-existing seed incident INC-2026-015 (for SKU-TABLET-055).
+  Test 5 creates a new incident for shipment SHIP-2026-0051.
   This validates both incident creation and state transitions without conflicts.
 
 Run directly:
@@ -53,12 +55,17 @@ HIGH_SEV_ITEM_NAME = "Pro Tablet 12"
 LOW_SEV_INCIDENT_ID = "INC-2026-018"
 LOW_SEV_INCIDENT_STATUS = "investigating"  # should remain unchanged after event
 
+# SHIP-2026-0051: in_transit, tracking 1Z999AA10123456795 (for Test 5 shipment delay)
+TEST5_SHIPMENT_ID = "SHIP-2026-0051"
+TEST5_TRACKING_NUMBER = "1Z999AA10123456795"
+
 TOPIC_ORDERS_DECISION     = "acme/orders/decision"
 TOPIC_INCIDENTS_CREATED   = "acme/incidents/created"
 TOPIC_INVENTORY_UPDATED   = "acme/inventory/updated"
 TOPIC_INVENTORY_ERRORS    = "acme/inventory/errors"
 TOPIC_INCIDENTS_RESPONSE  = "acme/incidents/response"
 TOPIC_LOGISTICS_UPDATED   = "acme/logistics/updated"
+TOPIC_LOGISTICS_DELAYED   = "acme/logistics/shipment-delayed"
 
 AGENT_TIMEOUT_S  = 30
 POST_MSG_SLEEP_S = 3   # let agent finish DB write before asserting
@@ -352,15 +359,47 @@ def run_tests(student_email="student@example.com"):
             f"(before={system_error_count_before}, after={system_error_count_after})"
         )
 
-    # ── Test 5 — Logistics delay creates shipment_delay incident (STUB - requires LogisticsAgent) ──
+    # ── Test 5 — Logistics delay creates shipment_delay incident ──
     print(_s(f"\n  ── Test 5 ─{'─' * (W - 12)}", "2"))
-    print(_s(f"  Logistics delay  →  new shipment_delay incident created (STUB)", "1"))
-    print(_s(f"  Published to:  {TOPIC_LOGISTICS_UPDATED} (requires LogisticsAgent)", "2"))
+    print(_s(f"  Logistics delay  →  new shipment_delay incident created", "1"))
+    print(_s(f"  Published to:  {TOPIC_LOGISTICS_DELAYED}", "2"))
     print(_s(f"  Listening on:  {TOPIC_INCIDENTS_CREATED}", "2"))
-    results.section("Test 5 — Shipment delay → shipment_delay incident (DEFERRED: requires LogisticsAgent)")
-    with results.test("t5_logistics_stub",
-                      label="Test 5 stub placeholder for LogisticsAgent implementation"):
-        assert True, "Stub ready for future logistics agent implementation"
+    msg5 = None
+    shipment_delay_count_before = row_count(
+        "incidents", "type = %s", ("shipment_delay",)
+    )
+    results.section("Test 5 — Shipment delay → shipment_delay incident created")
+    try:
+        with Spinner("Waiting for agent response"):
+            msg5 = _run_scenario(
+                sub_topic=TOPIC_INCIDENTS_CREATED,
+                pub_topic=TOPIC_LOGISTICS_DELAYED,
+                pub_payload={
+                    "shipment_id": TEST5_SHIPMENT_ID,
+                    "tracking_number": TEST5_TRACKING_NUMBER,
+                    "delay_hours": 24,
+                    "new_estimated_delivery": "2026-03-19T17:00:00Z",
+                    "reason": "Weather delay at distribution center"
+                },
+                predicate=lambda msg: "shipment_delay" in json.dumps(msg).lower(),
+            )
+    except Exception as exc:
+        results.record("t5_response_received", False, str(exc),
+                       label=f"Listening on {TOPIC_INCIDENTS_CREATED} — message received within {AGENT_TIMEOUT_S}s")
+
+    with results.test("t5_response_received",
+                      label=f"Listening on {TOPIC_INCIDENTS_CREATED} — message received within {AGENT_TIMEOUT_S}s"):
+        assert msg5 is not None, f"No message on {TOPIC_INCIDENTS_CREATED} within {AGENT_TIMEOUT_S}s"
+    time.sleep(POST_MSG_SLEEP_S)
+    with results.test("t5_shipment_delay_incident_created",
+                      label="New shipment_delay incident with severity='medium' created in database"):
+        shipment_delay_count_after = row_count(
+            "incidents", "type = %s AND severity = %s", ("shipment_delay", "medium")
+        )
+        assert shipment_delay_count_after > shipment_delay_count_before, (
+            f"No new shipment_delay incident found in DB "
+            f"(before={shipment_delay_count_before}, after={shipment_delay_count_after})"
+        )
 
     # ── Summary ───────────────────────────────────────────────────────────────
     print("\n" + results.summary())

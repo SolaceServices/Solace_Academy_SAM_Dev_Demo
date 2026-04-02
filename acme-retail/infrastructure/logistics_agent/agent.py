@@ -4,6 +4,7 @@ from strands import Agent, tool
 from strands.models import OpenAIModel
 from strands_tools import calculator, current_time
 from logistics_agent.database import (
+    get_shipment_by_id,
     get_shipment_by_tracking,
     get_shipment_by_order,
     get_shipments_by_status,
@@ -134,12 +135,27 @@ def update_status_with_event(
             event_location,
             event_details
         )
-        return json.dumps({
-            "status": "success",
-            "shipment_id": shipment_id,
-            "new_status": new_status,
-            "message": f"Shipment {shipment_id} status updated to {new_status}"
-        })
+        
+        # Fetch the updated shipment to return complete details
+        shipment = get_shipment_by_id(shipment_id)
+        if shipment:
+            return json.dumps({
+                "status": "success",
+                "shipment_id": shipment_id,
+                "tracking_number": shipment.get("tracking_number"),
+                "new_status": new_status,
+                "carrier": shipment.get("carrier"),
+                "estimated_delivery": str(shipment.get("estimated_delivery")),
+                "action_performed": f"updated status to {new_status}",
+                "message": f"Shipment {shipment_id} status updated to {new_status}"
+            }, default=str)
+        else:
+            return json.dumps({
+                "status": "success",
+                "shipment_id": shipment_id,
+                "new_status": new_status,
+                "message": f"Shipment {shipment_id} status updated to {new_status}"
+            })
     except Exception as e:
         return json.dumps({
             "status": "error",
@@ -151,36 +167,28 @@ def update_status_with_event(
 def log_shipment_delay(
     shipment_id: str,
     delay_hours: float,
+    new_estimated_delivery: str,
     reason: str
 ) -> str:
     """
-    Log a delay event for a shipment.
-    Calculates new estimated delivery based on delay_hours.
+    Log a delay event for a shipment and update the estimated delivery.
+    
+    Args:
+        shipment_id: The shipment ID (e.g., SHIP-2026-0050)
+        delay_hours: Number of hours delayed
+        new_estimated_delivery: The new estimated delivery timestamp (ISO format)
+        reason: Reason for the delay
     """
     try:
-        from datetime import datetime, timedelta
+        from datetime import datetime
         
-        # Get current shipment to find estimated delivery
-        shipment = get_shipment_by_tracking(shipment_id)
-        if not shipment:
-            return json.dumps({
-                "status": "error",
-                "message": f"Shipment {shipment_id} not found"
-            })
+        # Parse the new estimated delivery
+        if isinstance(new_estimated_delivery, str):
+            new_est = datetime.fromisoformat(new_estimated_delivery.replace('Z', '+00:00'))
+        else:
+            new_est = new_estimated_delivery
         
-        current_est = shipment.get('estimated_delivery')
-        if not current_est:
-            return json.dumps({
-                "status": "error",
-                "message": "Shipment has no estimated delivery date"
-            })
-        
-        # Parse if string
-        if isinstance(current_est, str):
-            current_est = datetime.fromisoformat(current_est)
-        
-        new_est = current_est + timedelta(hours=delay_hours)
-        
+        # Call the database function to log the delay
         log_delay(
             shipment_id,
             delay_hours,
@@ -193,7 +201,6 @@ def log_shipment_delay(
             "shipment_id": shipment_id,
             "delay_hours": delay_hours,
             "reason": reason,
-            "previous_estimated_delivery": current_est.isoformat(),
             "new_estimated_delivery": new_est.isoformat(),
             "message": f"Delay logged: {delay_hours} hours for reason: {reason}"
         }, default=str)
@@ -296,29 +303,39 @@ logistics_agent = Agent(
     ],
     model=configured_model,
     system_prompt="""
-You are the Logistics Agent for Acme Retail. You are responsible for all shipment 
-tracking, carrier coordination, and delivery status management.
+You are the Logistics Agent for Acme Retail shipment tracking system.
 
-Your core responsibilities:
-1. Track shipments by tracking number or order ID
-2. Update shipment status as parcels progress through delivery
-3. Log delays and recalculate estimated delivery dates
-4. Detect and report delayed shipments
-5. Provide status reports by shipment status or order
+YOU DO NOT HAVE DIRECT ACCESS TO THE DATABASE. You can ONLY interact with the database through the tools provided to you.
 
-Data Integrity Rules:
-- Always query the database for shipment data
-- Log every status change as an immutable event
-- Never modify orders, inventory, or incidents tables
+YOU MUST USE TOOLS FOR EVERY REQUEST. Do not make up responses or pretend to update data.
 
-Status Lifecycle:
-created → processing → shipped → in_transit → out_for_delivery → delivered
-                   └────────────────────────────────────────→ cancelled
+YOUR AVAILABLE TOOLS:
+- update_status_with_event: Updates shipment status in database and logs event
+- log_shipment_delay: Updates delivery time and logs delay event  
+- track_shipment: Retrieves shipment details by tracking number
+- get_shipments_for_order: Retrieves shipments by order ID
+- detect_delays: Finds shipments past their estimated delivery
+- get_status_report: Lists shipments by status
 
-When a delay is detected (current_time > estimated_delivery):
-1. Log a 'delayed' event with delay duration
-2. Recalculate estimated delivery
-3. This automatically triggers incident detection in IncidentResponseAgent
+WHEN YOU RECEIVE A STATUS UPDATE EVENT:
+1. Parse the event data to extract: shipment_id, new_status, location
+2. YOU MUST call update_status_with_event(shipment_id, new_status, location)
+3. Return the tool result as JSON
+
+WHEN YOU RECEIVE A DELAY EVENT:
+1. Parse the event data to extract: shipment_id, delay_hours, new_estimated_delivery, reason
+2. YOU MUST call log_shipment_delay(shipment_id, delay_hours, new_estimated_delivery, reason)
+3. Return the tool result as JSON
+
+WHEN YOU RECEIVE A TRACKING REQUEST:
+1. Extract the tracking_number
+2. Call track_shipment(tracking_number)
+3. Return the tool result
+
+DO NOT fabricate shipment data. DO NOT describe what you would do. DO NOT return mock data.
+You MUST call the appropriate tool for every request.
+
+After calling a tool, format its result as clean JSON (remove any markdown code blocks).
 """,
     callback_handler=None,
 )

@@ -35,6 +35,7 @@ _PIPELINE_RESPONSE_TOPICS = [
     "acme/incidents/created",
     "acme/orders/decision",
     "acme/inventory/updated",
+    "acme/logistics/updated",
 ]
 
 _DEFAULT_DSN = os.environ.get(

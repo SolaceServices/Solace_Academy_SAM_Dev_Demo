@@ -90,10 +90,15 @@ PORT="$(get_port)"
 UI_URL="$(build_ui_url "$PORT")"
 
 # Restart-friendly: free common SAM ports and kill LogisticsAgent (ignore errors)
+echo "🧹 Stopping any existing SAM and LogisticsAgent processes..."
 for p in 8000 8001 8443 8100; do
   fuser -k "${p}/tcp" >/dev/null 2>&1 || true
 done
-pkill -f "logistics_agent.server" >/dev/null 2>&1 || true
+# Kill LogisticsAgent by process name (more reliable than port-based)
+pkill -9 -f "logistics_agent.server" >/dev/null 2>&1 || true
+# Also kill any orphaned python processes on port 8100
+lsof -ti:8100 | xargs kill -9 >/dev/null 2>&1 || true
+sleep 2
 
 # Clear stale SQLite session databases and WAL journal files
 echo "🧹 Clearing stale session databases..."
@@ -201,8 +206,9 @@ LOGISTICS_AGENT_DIR="$INFRASTRUCTURE_DIR/logistics_agent"
 if [ -d "$LOGISTICS_AGENT_DIR" ] && [ -f "$SAM_DIR/configs/agents/a2a.yaml" ]; then
   echo "🚢 Starting LogisticsAgent (Strands)..."
   
-  # Kill any existing LogisticsAgent processes
-  pkill -f "logistics_agent.server" >/dev/null 2>&1 || true
+  # Ensure LogisticsAgent is fully stopped (already killed above, but double-check)
+  pkill -9 -f "logistics_agent.server" >/dev/null 2>&1 || true
+  lsof -ti:8100 | xargs kill -9 >/dev/null 2>&1 || true
   sleep 1
   
   # Ensure Strands dependencies are installed

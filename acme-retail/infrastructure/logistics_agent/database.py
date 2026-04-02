@@ -48,6 +48,47 @@ def execute_update(sql: str, params: tuple = ()) -> int:
         raise Exception(f"Update error: {str(e)}")
 
 
+def get_shipment_by_id(shipment_id: str) -> Optional[Dict]:
+    """Get full shipment record (with events) by shipment ID."""
+    sql = """
+    SELECT 
+        s.shipment_id,
+        s.order_id,
+        s.carrier,
+        s.tracking_number,
+        s.service_level,
+        s.status,
+        s.ship_date,
+        s.estimated_delivery,
+        s.actual_delivery,
+        s.cost
+    FROM shipments s
+    WHERE s.shipment_id = %s
+    """
+    results = execute_query(sql, (shipment_id,))
+    
+    if not results:
+        return None
+    
+    shipment = results[0]
+    
+    # Get events for this shipment
+    events_sql = """
+    SELECT 
+        timestamp,
+        location,
+        status,
+        description
+    FROM shipment_events
+    WHERE shipment_id = %s
+    ORDER BY timestamp ASC
+    """
+    events = execute_query(events_sql, (shipment['shipment_id'],))
+    shipment['events'] = events
+    
+    return shipment
+
+
 def get_shipment_by_tracking(tracking_number: str) -> Optional[Dict]:
     """Get full shipment record (with events) by tracking number."""
     sql = """
@@ -232,15 +273,25 @@ def log_shipment_event(
     # Use event_type as status, and event_details as description
     description = json.dumps(event_details) if event_details else event_type
     
-    results = execute_query(sql, (
-        shipment_id,
-        event_timestamp.isoformat() if isinstance(event_timestamp, datetime) else event_timestamp,
-        event_location or '',
-        event_type,
-        description
-    ))
-    
-    return results[0]['id'] if results else None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(sql, (
+            shipment_id,
+            event_timestamp.isoformat() if isinstance(event_timestamp, datetime) else event_timestamp,
+            event_location or '',
+            event_type,
+            description
+        ))
+        event_id = cur.fetchone()[0] if cur.description else None
+        conn.commit()
+        cur.close()
+        conn.close()
+        return event_id
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise Exception(f"Event logging error: {str(e)}")
 
 
 def log_delay(
@@ -252,8 +303,7 @@ def log_delay(
     """Log a delay event and update estimated delivery."""
     sql_update = """
     UPDATE shipments
-    SET estimated_delivery = %s,
-        updated_at = CURRENT_TIMESTAMP
+    SET estimated_delivery = %s
     WHERE shipment_id = %s
     """
     

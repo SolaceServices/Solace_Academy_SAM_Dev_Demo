@@ -261,3 +261,89 @@ def assert_field_equals(
                 f"{table}.{field} for {pk_column}={pk_value!r}: "
                 f"expected {expected!r}, got {actual!r}"
             )
+
+
+# ---------------------------------------------------------------------------
+# Shipment-specific assertion helpers
+# ---------------------------------------------------------------------------
+def assert_shipment_status(
+    shipment_id: str,
+    expected_status: str,
+    dsn: Optional[str] = None,
+):
+    """Assert that shipments.status == expected_status for shipment_id."""
+    shipment = fetch_shipment(shipment_id, dsn)
+    if shipment is None:
+        raise DBAssertionError(f"Shipment {shipment_id!r} not found in database")
+    actual = shipment.get("status")
+    if actual != expected_status:
+        raise DBAssertionError(
+            f"Shipment {shipment_id!r}: expected status {expected_status!r}, got {actual!r}"
+        )
+
+
+def assert_shipment_delivery(
+    shipment_id: str,
+    expected_delivery: str,
+    dsn: Optional[str] = None,
+):
+    """
+    Assert that shipments.estimated_delivery matches expected timestamp.
+    
+    expected_delivery should be an ISO 8601 string (e.g., "2026-03-16T18:00:00Z")
+    """
+    shipment = fetch_shipment(shipment_id, dsn)
+    if shipment is None:
+        raise DBAssertionError(f"Shipment {shipment_id!r} not found in database")
+    actual = shipment.get("estimated_delivery")
+    # Convert to string for comparison (handles timezone formatting)
+    actual_str = actual.isoformat() if hasattr(actual, "isoformat") else str(actual)
+    
+    # Normalize both strings - handle various PostgreSQL timestamp formats
+    # PostgreSQL: "2026-03-16 18:00:00+00" or "2026-03-16T18:00:00+00:00"
+    # Expected: "2026-03-16T18:00:00Z"
+    def normalize_timestamp(ts: str) -> str:
+        ts = ts.strip()
+        # Replace space with T
+        ts = ts.replace(" ", "T")
+        # Replace +00:00 or +00 with Z
+        ts = ts.replace("+00:00", "Z").replace("+00", "Z")
+        # Remove microseconds if present
+        ts = ts.replace(".000000Z", "Z")
+        return ts
+    
+    actual_normalized = normalize_timestamp(actual_str)
+    expected_normalized = normalize_timestamp(expected_delivery)
+    
+    if actual_normalized != expected_normalized:
+        raise DBAssertionError(
+            f"Shipment {shipment_id!r} estimated_delivery: "
+            f"expected {expected_delivery!r}, got {actual_str!r}"
+        )
+
+
+def shipment_event_count(
+    shipment_id: str,
+    event_status: Optional[str] = None,
+    dsn: Optional[str] = None,
+) -> int:
+    """
+    Count shipment_events for a given shipment (optionally filtered by status).
+    
+    shipment_event_count("SHIP-001")                    # all events
+    shipment_event_count("SHIP-001", "status_changed")  # only status_changed events
+    """
+    if event_status:
+        return row_count(
+            "shipment_events",
+            where="shipment_id = %s AND status = %s",
+            params=(shipment_id, event_status),
+            dsn=dsn,
+        )
+    else:
+        return row_count(
+            "shipment_events",
+            where="shipment_id = %s",
+            params=(shipment_id,),
+            dsn=dsn,
+        )

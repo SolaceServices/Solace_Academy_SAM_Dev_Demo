@@ -1,2 +1,4 @@
 solace-agent-mesh~=1.18.9
 git+https://github.com/SolaceLabs/solace-agent-mesh-core-plugins@fcccfd3498418f07009740a2071b4f8a08d99861#subdirectory=sam-sql-database-tool
+git+https://github.com/SolaceLabs/solace-agent-mesh-core-plugins@main#subdirectory=sam-rag
+git+https://github.com/SolaceLabs/solace-agent-mesh-core-plugins@main#subdirectory=sam-event-mesh-gateway

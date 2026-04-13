@@ -1,18 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-COURSE_ROOT="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+COURSE_ROOT="${1:-/workspaces/Solace_Academy_SAM_Dev_Demo/200-Orchestration}"
 SAM_DIR="$COURSE_ROOT/sam"
-SHARED_ENV="$COURSE_ROOT/../.env.config"
+SHARED_ENV="/workspaces/Solace_Academy_SAM_Dev_Demo/.env.config"
 SAM_ENV="$SAM_DIR/.env"
 PORT_DEFAULT=8000
 
-echo "📂 Course root: $COURSE_ROOT"
 cd "$SAM_DIR"
 
 # ----------------------------
 # Helpers
 # ----------------------------
+spinner() {
+  local pid=$1
+  local msg=$2
+  local spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+  local i=0
+  local seconds=0
+  while kill -0 "$pid" 2>/dev/null; do
+    i=$(( (i+1) % 10 ))
+    printf "\r${spin:$i:1} $msg (${seconds}s)"
+    sleep 0.1
+    if [ $((i % 10)) -eq 0 ]; then
+      seconds=$((seconds + 1))
+    fi
+  done
+  printf "\r"
+}
+
 get_port() {
   echo "${FASTAPI_PORT:-$PORT_DEFAULT}"
 }
@@ -34,40 +50,55 @@ ui_is_up() {
 # ----------------------------
 # Setup (only if needed)
 # ----------------------------
-if [ ! -d ".venv" ]; then
-  echo "🔧 Creating virtual environment..."
-  python3 -m venv .venv
+if [ ! -f ".venv/bin/activate" ]; then
+  echo "⚙️  Setting up environment..."
+  rm -rf .venv  # Clean up any corrupted venv
+  if ! python3 -m venv .venv; then
+    echo "❌ Error: Failed to create virtual environment"
+    echo "   Try: python3 -m venv .venv"
+    exit 1
+  fi
+else
+  echo "✅ Environment configured"
 fi
 
-echo "⚡ Activating virtual environment..."
 # shellcheck disable=SC1091
-source .venv/bin/activate
+if ! source .venv/bin/activate; then
+  echo "❌ Error: Failed to activate virtual environment"
+  echo "   The .venv directory may be corrupted. Try: rm -rf .venv"
+  exit 1
+fi
 
 if [ ! -f ".venv/.deps_installed" ]; then
-  echo "📦 Installing dependencies..."
-  pip install -r requirements.txt
-  playwright install
+  pip install -q -r requirements.txt >/dev/null 2>&1 &
+  spinner $! "📦 Installing dependencies..."
+  wait $!
+  if [ $? -ne 0 ]; then
+    echo "❌ Error: Failed to install Python dependencies"
+    exit 1
+  fi
+  echo "✅ Dependencies installed"
+  playwright install >/dev/null 2>&1 || echo "⚠️  Warning: Playwright installation failed (may not be needed)"
   touch ".venv/.deps_installed"
 else
-  echo "📦 Dependencies already installed (skipping)."
+  echo "✅ Dependencies installed"
 fi
 
 if [ ! -d ".sam" ] && [ ! -f "sam.yaml" ] && [ ! -f "sam.yml" ]; then
-  echo "🚀 Initializing SAM..."
-  sam init --skip
-else
-  echo "🚀 SAM already initialized (skipping)."
+  # sam init overwrites requirements.txt — preserve ours first
+  cp requirements.txt requirements.txt.bak
+  sam init --skip >/dev/null 2>&1
+  cp requirements.txt.bak requirements.txt
+  rm requirements.txt.bak
 fi
 
 if [ -f "$SHARED_ENV" ]; then
   if [ ! -f "$SAM_ENV" ] || ! cmp -s "$SHARED_ENV" "$SAM_ENV"; then
-    echo "🔁 Syncing shared .env.config → sam/.env"
     cp -f "$SHARED_ENV" "$SAM_ENV"
-  else
-    echo "🔁 sam/.env already up to date (skipping)."
   fi
 else
-  echo "⚠️ Shared .env.config not found at: $SHARED_ENV (skipping env sync)"
+  echo "⚠️  Warning: .env.config not found at $SHARED_ENV"
+  echo "    Some environment variables may not be set correctly"
 fi
 
 # Load sam/.env into the current shell (so FASTAPI_PORT etc are available)
@@ -89,26 +120,30 @@ for p in 8000 8001 8443; do
   fuser -k "${p}/tcp" >/dev/null 2>&1 || true
 done
 
-  # Verify Solace Broker container is running
-  if docker ps | grep -q solace; then
-    echo "🧩 Broker already running (skipping)."
-  else
-    bash ../../.devcontainer/setup-broker.sh
+# Verify Solace Broker container is running
+if ! docker ps | grep -q solace; then
+  bash ../../.devcontainer/setup-broker.sh >/dev/null 2>&1 &
+  spinner $! "🚀 Starting Solace broker..."
+  wait $!
+  if [ $? -ne 0 ]; then
+    echo "❌ Error: Failed to start Solace broker"
+    exit 1
   fi
+  echo "✅ Solace broker started"
+else
+  echo "✅ Solace broker running"
+fi
 
 # Print URL once the UI is reachable
-echo "⏳ Loading UI..."
+echo "🚀 Starting SAM..."
 set +m
 (
   until ui_is_up "$PORT"; do
     sleep 1
   done
   echo ""
-  echo "🌐 SAM UI: $UI_URL"
+  echo "✅ SAM UI ready: $UI_URL"
   echo ""
-  exit 0
 ) &
 
-# Run SAM in the foreground so logs behave normally and it stays running
-echo "🏃 Running SAM..."
 sam run

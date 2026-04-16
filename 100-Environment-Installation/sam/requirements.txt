@@ -1,1 +1,6 @@
-solace-agent-mesh~=1.18.9
+solace-agent-mesh==1.18.29
+
+# Pin dependency versions
+opentelemetry-api==1.37.0
+opentelemetry-sdk==1.37.0
+rich==13.9.4

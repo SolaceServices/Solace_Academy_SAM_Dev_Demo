@@ -108,7 +108,7 @@ Each numbered directory maps to a specific course:
 100-Environment-Installation/     ← You are here
 200-Orchestration/
 300-Agents/
-400-Evals/
+400-Workflows/
 500-Tooling-Plugins/
 600-Troubleshooting/
 700-System-Design/

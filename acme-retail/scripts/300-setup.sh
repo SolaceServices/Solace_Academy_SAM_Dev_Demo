@@ -79,7 +79,6 @@ if [ ! -f ".venv/.deps_installed" ]; then
     exit 1
   fi
   echo "✅ Dependencies installed"
-  playwright install >/dev/null 2>&1 || echo "⚠️  Warning: Playwright installation failed (may not be needed)"
   touch ".venv/.deps_installed"
 else
   echo "✅ Dependencies installed"

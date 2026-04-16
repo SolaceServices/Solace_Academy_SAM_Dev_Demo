@@ -57,8 +57,8 @@
           "value": "'source ./300-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents'"
         },
         {
-          "label": "400 - Evals",
-          "value": "'source ./400-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/400-Evals'"
+          "label": "400 - Workflows",
+          "value": "'source ./400-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/400-Workflows'"
         },
         {
           "label": "500 - Tooling & Plugins",

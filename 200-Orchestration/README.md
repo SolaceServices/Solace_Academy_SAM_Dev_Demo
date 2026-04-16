@@ -18,7 +18,7 @@ By the end of this course, you'll understand:
 
 ## Quick Setup
 
-We've included some setup automation to make our lives easier going forward, so as long as you've completed course `100-Environment-Installation` and created a `.env.config` file, setting up your environment for this time is much simpler. 
+We've included some setup automation to make our lives easier going forward, so as long as you've completed course `100-Environment-Installation` and created a `.env.config` file, setting up your environment this time is much simpler. 
 
 At the bottom of your code editor, click the `Run Course Setup` button, then select `200-Orchestration` from the drop down list. 
 #### This will:

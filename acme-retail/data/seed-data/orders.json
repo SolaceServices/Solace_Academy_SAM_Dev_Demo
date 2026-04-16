@@ -261,7 +261,7 @@
       "customer_name": "Robert Martinez",
       "customer_email": "robert.martinez@email.com",
       "order_date": "2026-03-10T15:30:00Z",
-      "status": "pending",
+      "status": "shipped",
       "priority": "express",
       "total_amount": 2499.99,
       "currency": "USD",
@@ -281,9 +281,9 @@
           "total_price": 2499.99
         }
       ],
-      "shipment_id": null,
-      "tracking_number": null,
-      "estimated_delivery": "2026-03-12T17:00:00Z",
+      "shipment_id": "SHIP-2026-0051",
+      "tracking_number": "1Z999AA10123456795",
+      "estimated_delivery": "2026-03-18T17:00:00Z",
       "notes": "High-value order - requires special handling"
     },
     {
@@ -337,7 +337,7 @@
       "customer_name": "Christopher Brown",
       "customer_email": "chris.brown@email.com",
       "order_date": "2026-03-10T17:00:00Z",
-      "status": "pending",
+      "status": "processing",
       "priority": "standard",
       "total_amount": 99.99,
       "currency": "USD",
@@ -357,19 +357,50 @@
           "total_price": 99.98
         }
       ],
-      "shipment_id": null,
-      "tracking_number": null,
-      "estimated_delivery": "2026-03-14T17:00:00Z",
-      "notes": "Awaiting warehouse processing"
+      "shipment_id": "SHIP-2026-0049",
+      "tracking_number": "1Z999AA10123456793",
+      "estimated_delivery": "2026-03-14T12:00:00Z",
+      "notes": "Shipment label created"
+    },
+    {
+      "order_id": "ORD-2026-011",
+      "customer_id": "CUST-1011",
+      "customer_name": "Patricia Anderson",
+      "customer_email": "patricia.anderson@email.com",
+      "order_date": "2026-03-13T14:20:00Z",
+      "status": "shipped",
+      "priority": "express",
+      "total_amount": 399.99,
+      "currency": "USD",
+      "shipping_address": {
+        "street": "321 Tech Park",
+        "city": "Dallas",
+        "state": "TX",
+        "zip": "75201",
+        "country": "USA"
+      },
+      "items": [
+        {
+          "item_id": "SKU-SPEAKER-044",
+          "product_name": "Bluetooth Speaker Pro",
+          "quantity": 1,
+          "unit_price": 399.99,
+          "total_price": 399.99
+        }
+      ],
+      "shipment_id": "SHIP-2026-0050",
+      "tracking_number": "1Z999AA10123456794",
+      "estimated_delivery": "2026-03-15T12:00:00Z",
+      "notes": "Overnight shipping - in transit"
     }
   ],
   "metadata": {
-    "total_orders": 10,
+    "total_orders": 11,
     "generated_date": "2026-03-10T18:49:00Z",
     "statuses": {
-      "pending": 3,
-      "processing": 2,
-      "shipped": 1,
+      "pending": 1,
+      "processing": 3,
+      "shipped": 3,
       "delivered": 2,
       "cancelled": 1,
       "blocked": 1

@@ -1,0 +1,9 @@
+solace-agent-mesh==1.18.29
+git+https://github.com/SolaceLabs/solace-agent-mesh-core-plugins@fcccfd3498418f07009740a2071b4f8a08d99861#subdirectory=sam-sql-database-tool
+git+https://github.com/SolaceLabs/solace-agent-mesh-core-plugins@589088126642fa5ffa483c0eb0cffdb0adbe09b9#subdirectory=sam-rag
+git+https://github.com/SolaceLabs/solace-agent-mesh-core-plugins@589088126642fa5ffa483c0eb0cffdb0adbe09b9#subdirectory=sam-event-mesh-gateway
+
+# Pin dependency versions
+opentelemetry-api==1.37.0
+opentelemetry-sdk==1.37.0
+rich==13.9.4

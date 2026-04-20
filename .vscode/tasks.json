@@ -98,6 +98,10 @@
         {
           "label": "5️⃣ Logistics Management",
           "value": "--test-logistics"
+        },
+        {
+          "label": "6️⃣ Morning Briefing Workflow",
+          "value": "--test-morning-briefing-workflow"
         }
       ]
     }

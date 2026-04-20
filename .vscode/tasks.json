@@ -62,15 +62,15 @@
         },
         {
           "label": "500 - Tooling & Plugins",
-          "value": "'source ./600-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/600-Tooling-Plugins'"
+          "value": "'source ./500-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/500-Tooling-Plugins'"
         },
         {
           "label": "600 - Troubleshooting",
-          "value": "'source ./700-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/700-Troubleshooting'"
+          "value": "'source ./600-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/700-Troubleshooting'"
         },
         {
           "label": "700 - System Design",
-          "value": "'source ./800-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/800-System-Design'"
+          "value": "'source ./700-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/800-System-Design'"
         }
       ]
     },

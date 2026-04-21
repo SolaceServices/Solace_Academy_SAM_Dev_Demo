@@ -14,7 +14,7 @@ FINAL_MASTER_GUIDE.md
 # SAM runtime artifacts
 */sam/.venv/
 */*/node_modules/
-*/sam/package-lock.json
+*package-lock.json
 */sam/package.json
 */sam/*.db
 */sam/*.db-shm
@@ -34,6 +34,7 @@ acme-retail/infrastructure/logistics_agent/.deps_installed
 # Python cache
 **/__pycache__/
 **/*.pyc
+*.pytest_cache
 
 #Test Results
 test_results.xml

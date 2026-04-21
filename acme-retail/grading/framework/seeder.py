@@ -189,10 +189,25 @@ def _clear_agent_session_dbs(sam_dir: str = None):
             print(f"  ⚠️  Warning: could not clear {name}: {exc}")
 
 
+def _clear_email_inbox(url: str = "http://localhost:3000/clear"):
+    """
+    Clear all emails from the mock email service inbox.
+    Non-fatal if the service is not running (email tool may not be in use).
+    """
+    try:
+        import urllib.request
+        req = urllib.request.Request(url, data=b"", method="POST")
+        with urllib.request.urlopen(req, timeout=3):
+            pass
+    except Exception:
+        pass  # non-fatal — email service may not be running for this module
+
+
 def full_reset(
     seeder_path: str = _DEFAULT_SEEDER_PATH,
     dsn: str = None,
     timeout_s: int = 30,
+    sam_dir: str = None,
 ):
     """
     Truncate all tables, re-seed from JSON files, and delete the agent's
@@ -210,4 +225,5 @@ def full_reset(
     _drain_broker_topics()
     reset_to_seed(seeder_path=seeder_path, dsn=dsn, timeout_s=timeout_s)
     _drain_broker_topics(idle_s=5.0, max_wait_s=15.0)
-    _clear_agent_session_dbs()
+    _clear_agent_session_dbs(sam_dir)
+    _clear_email_inbox()

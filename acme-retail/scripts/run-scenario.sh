@@ -35,6 +35,11 @@ case "$1" in
     exec /workspaces/Solace_Academy_SAM_Dev_Demo/400-Workflows/sam/.venv/bin/python \
       -m tests.test_morning_briefing_workflow
     ;;
+  --test-email-tool)
+    cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/grading
+    exec /workspaces/Solace_Academy_SAM_Dev_Demo/500-Tooling-Plugins/sam/.venv/bin/python \
+      -m tests.test_email_tool_parallel
+    ;;
   *)
     exec bash ./simulate-events.sh "$@"
     ;;

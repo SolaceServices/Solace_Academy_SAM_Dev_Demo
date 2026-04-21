@@ -102,6 +102,10 @@
         {
           "label": "6️⃣ Morning Briefing Workflow",
           "value": "--test-morning-briefing-workflow"
+        },
+        {
+          "label": "7️⃣ Email Tool Integration",
+          "value": "--test-email-tool"
         }
       ]
     }

@@ -1,527 +1,290 @@
-# Course 500: Agent Mesh — Tooling and Plugins
+# Course 500: Tooling and Plugins — Mock Email Service Integration
 
 ## Overview
 
-This course explores how to extend agent capabilities through tools and plugins. You'll learn the plugin lifecycle, create custom tools, integrate REST APIs, and connect to external services like AWS Bedrock Knowledge Bases.
+In this hands-on course, you'll learn how to extend agent capabilities by attaching new tools to existing agents. You'll add a **mock email service tool** to the IncidentResponseAgent, enabling it to send alert emails when high-severity incidents are detected.
+
+This module demonstrates the plugin lifecycle using real tools already in your SAM environment, then guides you through adding a custom tool step-by-step.
+
+---
+
+## Learning Objectives
 
 By the end of this course, you'll understand:
-- The SAM plugin ecosystem and architecture
-- How to install, configure, and manage plugins
-- Creating custom Python tools for agents
-- Integrating REST APIs as agent capabilities
-- Connecting to AWS services (Bedrock KB, S3, DynamoDB)
+
+1. **Plugin Architecture** — What are plugins vs. tools? (Core, Community, Private)
+2. **Plugin Lifecycle** — How SAM loads and initializes tools
+3. **Attaching Tools** — How to add a new tool to an existing agent
+4. **Tool Invocation** — Observing tool inputs, outputs, latency, and errors
+5. **Production Migration** — How to swap mock services for real services
+
+---
 
 ## Prerequisites
 
-- Completed **Course 100**, **200**, and **300**
-- Working SAM installation with multiple agents
-- Familiarity with Python and REST APIs
-- (Optional) AWS account for Bedrock integration
+- Completed **Course 300** (Agent Mesh Architecture)
+- Familiarity with YAML configuration
+- Basic understanding of REST APIs
+- PostgreSQL and SAM environment running
+
+---
 
 ## Quick Setup
 
-```bash
+\`\`\`bash
 cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/scripts
 bash 500-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/500-Tooling-Plugins
-```
+\`\`\`
 
-## What are Tools and Plugins?
+**What the setup script does:**
+
+✅ Sets up Solace broker, PostgreSQL, and all agents from Module 300  
+✅ **Starts mock email service** on port 3000 (background process)  
+✅ **Installs npm dependencies** for the email service (Express.js)  
+✅ **Creates Python email tool wrapper** at \`/acme-retail/infrastructure/email_tool.py\`  
+✅ **Enables scheduler service** in WebUI gateway (for scheduled tasks)  
+✅ Seeds test incident data
+
+**What you'll do manually (hands-on learning):**
+
+📝 Add email tool configuration to IncidentResponseAgent YAML  
+📝 Update agent instruction to send emails for high-severity incidents  
+🧪 Test the integration by triggering incidents  
+👀 Observe tool invocation in SAM UI
+
+---
+
+## Verifying Setup
+
+After running the setup script, verify everything is working:
+
+**1. Check SAM is running:**
+\`\`\`bash
+curl http://localhost:8000/api/v1/health
+# Should return: {"status":"healthy"}
+\`\`\`
+
+**2. Check email service is running:**
+\`\`\`bash
+curl http://localhost:3000/health
+# Should return: {"status":"ok","emailCount":0}
+\`\`\`
+
+**3. Access the email inbox:**
+Open your browser to \`http://localhost:3000\` - you should see an empty inbox dashboard.
+
+**4. Check SAM logs for errors:**
+\`\`\`bash
+tail -50 /workspaces/Solace_Academy_SAM_Dev_Demo/500-Tooling-Plugins/sam/sam.log
+\`\`\`
+
+If you see any errors related to the \`EmailTool\` or \`IncidentResponseAgent\`, see the Troubleshooting section below.
+
+
+---
+
+## What Are Tools and Plugins?
+
+### Tools
 
 **Tools** are capabilities that agents can use to accomplish tasks:
-- Query databases
-- Call APIs
-- Read/write files
-- Perform calculations
-- Access external services
-
-**Plugins** are pre-packaged bundles of tools, configurations, and dependencies:
-- SAM RAG Agent → includes document scanner, vector DB, semantic search
-- SQL Database Tool → provides database query capabilities
-- Event Mesh Gateway → enables event-driven workflows
-
-### Tool Types in SAM
-
-#### 1. Builtin Tools
-Pre-installed with SAM, no configuration needed:
-
-```yaml
-tools:
-  - tool_type: builtin
-    tool_name: create_chart_from_plotly_config
-  
-  - tool_type: builtin
-    tool_name: load_artifact
-  
-  - tool_type: builtin
-    tool_name: list_artifacts
-```
-
-**Available builtins**:
-- `create_chart_from_plotly_config` — Generate charts
-- `create_table_from_csv_string` — Render tables
-- `load_artifact`, `list_artifacts` — Artifact management
-- `create_artifact`, `update_artifact` — Artifact CRUD
-
-#### 2. Python Tools
-Custom Python classes implementing specific functionality:
-
-```yaml
-tools:
-  - tool_type: python
-    component_module: "sam_sql_database_tool.tools"
-    component_base_path: .
-    class_name: "SqlDatabaseTool"
-    tool_config:
-      tool_name: "orders_db"
-      tool_description: "Query the Acme Retail orders database"
-      connection_string: "${ORDERS_DB_CONNECTION_STRING}"
-```
 
-#### 3. MCP Tools
-Model Context Protocol servers (external processes):
+- Query databases → \`SqlDatabaseTool\`
+- Send emails → \`EmailTool\`
+- Read files → MCP filesystem tool
+- Call APIs → Custom HTTP tools
+- Create charts → Builtin \`create_chart_from_plotly_config\`
 
-```yaml
-tools:
-  - tool_type: mcp
-    connection_params:
-      type: stdio
-      command: "node"
-      args:
-        - "/path/to/mcp_postgres_rw.js"
-        - "postgresql://user:pass@host:port/database"
-      timeout: 10
-    tool_name_prefix: "postgres"
-```
+### Plugins
 
-#### 4. A2A Tools
-External agents discovered via A2A protocol:
+**Plugins** are pre-packaged bundles of tools + configurations + dependencies.
 
-```yaml
-tools:
-  - tool_type: a2a_agent
-    agent_name: "LogisticsAgent"
-    agent_url: "http://localhost:8100"
-    agent_card_url: "http://localhost:8100/.well-known/agent.json"
-```
+**Plugin Types:**
 
-## The Plugin Lifecycle
+1. **Core Plugins** — Built into SAM (no installation needed)
+   - Example: \`create_chart_from_plotly_config\`, \`create_artifact\`
 
-### 1. Discovery
+2. **Community Plugins** — Available in SAM catalog
+   - Example: \`sam-sql-database-tool\`, \`sam-rag\`, \`sam-event-mesh-gateway\`
+   - Install with: \`sam plugin add agent_name --plugin plugin_name\`
 
-View available plugins:
+3. **Private Plugins** — Custom tools you build yourself
+   - Example: The \`EmailTool\` you'll create in this course
+   - Stored in \`/acme-retail/infrastructure/\`
 
-```bash
-sam plugin catalog
-```
-
-Or browse programmatically:
-
-```bash
-sam plugin list-available
-```
-
-### 2. Installation
-
-Install a plugin by name:
-
-```bash
-sam plugin add agent_name --plugin plugin_name
-```
-
-Examples:
-
-```bash
-# Install RAG agent
-sam plugin add acme_knowledge --plugin sam-rag
-
-# Install SQL tool
-sam plugin add order_agent --plugin sam-sql-database-tool
+---
 
-# Install event mesh gateway
-sam plugin add acme-orders --plugin sam-event-mesh-gateway
-```
+## Key Implementation Details
 
-### 3. Configuration
-
-After installation, edit the generated YAML config:
-
-```bash
-# Agent plugin
-configs/agents/acme_knowledge.yaml
-
-# Gateway plugin
-configs/gateways/acme-orders.yaml
-```
-
-Configure environment variables, tool parameters, and agent instructions.
-
-### 4. Activation
-
-Restart SAM to load the plugin:
-
-```bash
-sam run
-```
-
-SAM auto-discovers all YAML files in `configs/` (except `shared_config*.yaml` and `_*` prefixed files).
-
-### 5. Update
-
-Update plugin to latest version:
-
-```bash
-sam plugin update plugin_name
-```
-
-### 6. Removal
-
-Uninstall a plugin:
-
-```bash
-sam plugin remove agent_name
-```
-
-This deletes the YAML config and uninstalls dependencies.
-
-## Creating Custom Python Tools
-
-Let's create a custom tool that calls an external pricing API.
-
-### Step 1: Create Tool Class
+### EmailTool Architecture
 
-```python
-# pricing_tool.py
+The \`EmailTool\` is a Python class that inherits from SAM's \`DynamicTool\` base class. It must implement:
 
-from typing import Dict, Any
-import requests
+1. **\`tool_name\`** property — The function name the LLM will call (e.g., \`send_alert_email\`)
+2. **\`tool_description\`** property — What the tool does (helps LLM decide when to use it)
+3. **\`parameters_schema\`** property — Defines the function signature (recipient, subject, body)
+4. **\`_run_async_impl()\`** method — Framework entry point (extracts args, calls \`run()\`)
+5. **\`run()\`** async method — Your actual implementation (makes HTTP call to email service)
 
-class PricingTool:
-    """Tool to query product pricing from external API."""
-    
-    def __init__(self, api_endpoint: str, api_key: str):
-        self.api_endpoint = api_endpoint
-        self.api_key = api_key
-    
-    def get_price(self, product_sku: str) -> Dict[str, Any]:
-        """
-        Get current price for a product SKU.
-        
-        Args:
-            product_sku: The product SKU to query
-        
-        Returns:
-            Dict with price, currency, and availability
-        """
-        try:
-            response = requests.get(
-                f"{self.api_endpoint}/prices/{product_sku}",
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                timeout=10
-            )
-            response.raise_for_status()
-            
-            data = response.json()
-            return {
-                "sku": product_sku,
-                "price": data.get("current_price"),
-                "currency": data.get("currency", "USD"),
-                "available": data.get("in_stock", False),
-                "last_updated": data.get("updated_at")
-            }
-        except Exception as e:
-            return {"error": str(e)}
-```
+### Critical Import Requirements
 
-### Step 2: Add Tool to Agent Config
+SAM tools **must** import types from \`google.genai\`, not \`google.adk\`:
 
-```yaml
-# configs/agents/pricing_agent.yaml
+\`\`\`python
+# ✅ CORRECT
+from google.genai import types as adk_types
 
-tools:
-  - tool_type: python
-    component_module: "pricing_tool"
-    component_base_path: "/path/to/pricing_tool.py"
-    class_name: "PricingTool"
-    tool_config:
-      api_endpoint: "${PRICING_API_ENDPOINT}"
-      api_key: "${PRICING_API_KEY}"
-```
+# ❌ WRONG (will cause ImportError and prevent agent from loading)
+from google.adk import types as adk_types
+\`\`\`
 
-### Step 3: Update Agent Instruction
+This is the same pattern used by all built-in SAM tools (\`web_tools.py\`, \`dynamic_tool.py\`, etc.).
 
-```yaml
-instruction: |
-  You are a Pricing Agent. Use the PricingTool to query current product prices.
-  
-  When asked about pricing:
-  1. Call get_price(product_sku) to fetch current price
-  2. Return the price, currency, and availability
-  3. Mention the last_updated timestamp
-  
-  Example:
-  User: "What is the price of SKU-LAPTOP-002?"
-  You: [Call get_price("SKU-LAPTOP-002")]
-  You: "SKU-LAPTOP-002 is currently $899.99 USD. It is in stock. Last updated 2026-04-14."
-```
+### Mock Email Service
 
-### Step 4: Test
-
-```bash
-sam run
-```
-
-Ask the agent: *"What is the price of SKU-LAPTOP-002?"*
-
-The agent should call the tool and return formatted pricing information.
-
-## Integrating REST APIs
-
-### Method 1: Custom Python Tool (Above)
-
-Best for:
-- APIs requiring custom authentication
-- Complex request/response transformations
-- Stateful API clients
-
-### Method 2: OpenAPI Spec (SAM Native)
-
-SAM can auto-generate tools from OpenAPI specs:
-
-```bash
-sam add tool --openapi https://api.example.com/openapi.json
-```
-
-This generates a Python tool class with methods for each API endpoint.
-
-### Method 3: Direct HTTP Calls (Agent Code)
-
-For simple cases, agents can use builtin HTTP capabilities:
-
-```yaml
-instruction: |
-  You can make HTTP requests using the requests library.
-  
-  Example:
-  import requests
-  response = requests.get("https://api.example.com/endpoint")
-  data = response.json()
-```
-
-**Note**: This is less structured than dedicated tools but works for ad-hoc queries.
-
-## AWS Bedrock Knowledge Base Integration
-
-Connect SAM to AWS Bedrock Knowledge Bases for enterprise RAG.
-
-### Prerequisites
-
-- AWS account with Bedrock access
-- Knowledge Base created in AWS Console
-- IAM credentials with `bedrock:RetrieveAndGenerate` permission
-
-### Step 1: Install AWS SDK
-
-```bash
-pip install boto3
-```
-
-### Step 2: Configure AWS Credentials
-
-```bash
-# ~/.aws/credentials
-[default]
-aws_access_key_id = YOUR_ACCESS_KEY
-aws_secret_access_key = YOUR_SECRET_KEY
-```
-
-Or via environment variables:
-
-```bash
-export AWS_ACCESS_KEY_ID="YOUR_ACCESS_KEY"
-export AWS_SECRET_ACCESS_KEY="YOUR_SECRET_KEY"
-export AWS_DEFAULT_REGION="us-east-1"
-```
-
-### Step 3: Create Bedrock Tool
-
-```python
-# bedrock_kb_tool.py
-
-import boto3
-from typing import Dict, Any
-
-class BedrockKnowledgeTool:
-    """Tool to query AWS Bedrock Knowledge Base."""
-    
-    def __init__(self, knowledge_base_id: str, region: str = "us-east-1"):
-        self.kb_id = knowledge_base_id
-        self.client = boto3.client('bedrock-agent-runtime', region_name=region)
-    
-    def query_knowledge(self, question: str) -> Dict[str, Any]:
-        """
-        Query the knowledge base.
-        
-        Args:
-            question: Natural language question
-        
-        Returns:
-            Dict with answer and source documents
-        """
-        try:
-            response = self.client.retrieve_and_generate(
-                input={'text': question},
-                retrieveAndGenerateConfiguration={
-                    'type': 'KNOWLEDGE_BASE',
-                    'knowledgeBaseConfiguration': {
-                        'knowledgeBaseId': self.kb_id,
-                        'modelArn': 'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0'
-                    }
-                }
-            )
-            
-            return {
-                "answer": response['output']['text'],
-                "sources": [
-                    {
-                        "content": ref['content']['text'],
-                        "location": ref.get('location', {}).get('s3Location', {})
-                    }
-                    for ref in response.get('citations', [])
-                ]
-            }
-        except Exception as e:
-            return {"error": str(e)}
-```
-
-### Step 4: Add to Agent
-
-```yaml
-tools:
-  - tool_type: python
-    component_module: "bedrock_kb_tool"
-    component_base_path: "/path/to/bedrock_kb_tool.py"
-    class_name: "BedrockKnowledgeTool"
-    tool_config:
-      knowledge_base_id: "${BEDROCK_KB_ID}"
-      region: "${AWS_REGION, us-east-1}"
-```
-
-### Step 5: Test
-
-```bash
-sam run
-```
-
-Ask the agent: *"What is our company's return policy?"*
-
-The agent queries Bedrock KB and returns the answer with source citations.
-
-## Plugin Best Practices
-
-### Configuration
-- Use environment variables for secrets (`${VAR_NAME}`)
-- Store configs in `shared_config.yaml` for reuse
-- Always validate tool parameters before use
-
-### Error Handling
-- Tools should return error objects (not raise exceptions)
-- Include helpful error messages for debugging
-- Log errors without exposing sensitive data
-
-### Documentation
-- Provide clear tool descriptions (agents read these)
-- Include examples in agent instructions
-- Document required parameters and return formats
-
-### Performance
-- Set reasonable timeouts (10s for network calls)
-- Cache expensive operations when possible
-- Use connection pooling for databases
-
-### Security
-- Never hardcode API keys in YAML
-- Use IAM roles (not long-lived credentials) for AWS
-- Validate input parameters to prevent injection
-
-## Common Plugin Issues
-
-### Issue: Plugin installation fails
-
-**Cause**: Missing dependencies or version conflicts
-
-**Solution**:
-```bash
-pip install --upgrade plugin-name
-pip list | grep plugin-name  # Verify version
-```
-
-### Issue: Tool not discovered by agent
-
-**Cause**: Incorrect tool configuration
-
-**Solution**:
-- Verify `tool_type` matches implementation
-- Check `component_module` path is correct
-- Ensure YAML is in `configs/agents/` (not `_configs/`)
-
-### Issue: MCP server fails to start
-
-**Cause**: Missing Node.js dependencies or wrong paths
-
-**Solution**:
-```bash
-npm install @modelcontextprotocol/server-postgres
-which node  # Verify node is in PATH
-```
-
-### Issue: Custom tool returns errors
-
-**Cause**: Incorrect parameters or authentication
-
-**Solution**:
-- Test tool directly (outside SAM) to isolate issue
-- Check environment variables are loaded: `echo $VAR_NAME`
-- Verify API credentials and endpoints
-
-## Key Takeaways
-
-### Tool Architecture
-- **Builtin tools** are pre-installed, no config needed
-- **Python tools** are custom classes for specific functionality
-- **MCP tools** are external processes (Node.js servers, etc.)
-- **A2A tools** are external agents discovered dynamically
-
-### Plugin Management
-- Use `sam plugin catalog` to browse available plugins
-- Install with `sam plugin add name --plugin plugin_name`
-- Configure via generated YAML files
-- Restart SAM to activate changes
-
-### Custom Tools
-- Implement as Python classes with clear method signatures
-- Return structured data (dicts, not exceptions)
-- Include comprehensive error handling
-- Document parameters and return values
-
-### Integration Patterns
-- REST APIs → Custom Python tools or OpenAPI specs
-- AWS Services → Boto3-based tools with IAM credentials
-- External Agents → A2A protocol for discovery and routing
-
-## Next Steps
-
-In **Course 600: Troubleshooting**, you'll:
-- Learn where SAM logs are stored
-- Configure logging levels and formats
-- Debug common agent issues
-- Use SAM's built-in debugging tools
-
-Your agent mesh now has extended capabilities via custom tools and plugins!
-
-## Additional Resources
-
-- Setup script: `500-env-setup.md`
-- SAM plugin catalog: `sam plugin list-available`
-- Python tool examples: `/acme-retail/infrastructure/`
-- AWS Bedrock docs: https://docs.aws.amazon.com/bedrock/
-- MCP protocol spec: https://modelcontextprotocol.io/
+The email service is a simple Express.js server that:
+- Listens on port 3000
+- Accepts POST requests to \`/send-email\`
+- Stores emails in memory (resets on restart)
+- Serves a real-time inbox dashboard at \`/\` (auto-refreshes every 2 seconds)
+- Provides health check at \`/health\`
+
+**Production Replacement:** In production, you'd swap this for AWS SES, SendGrid, or SMTP. Only the \`service_url\` in the tool config would change.
+
+---
+
+For the complete hands-on walkthrough, learning activities, and production migration guide, see the full Module 500 documentation in the FINAL_MASTER_GUIDE.md file.
+
+**Quick Start Steps:**
+
+1. Run setup script (above)
+2. Open \`500-Tooling-Plugins/sam/configs/agents/incident_response_agent_agent.yaml\`
+3. Add email tool configuration to the \`tools:\` section
+4. Update agent instruction to send emails for high-severity incidents
+5. Test using the VS Code task: **Simulate Events → 7️⃣ Email Tool Integration**
+6. View emails at: \`http://localhost:3000\`
+
+**Email Tool Configuration to Add:**
+
+\`\`\`yaml
+      # NEW: Email alert tool (Module 500)
+      - tool_type: python
+        component_module: "email_tool"
+        component_base_path: "/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/infrastructure"
+        class_name: "EmailTool"
+        tool_config:
+          service_url: "http://localhost:3000"
+\`\`\`
+
+**Agent Instruction Addition:**
+
+Add this to the \`instruction:\` section:
+
+\`\`\`yaml
+        When creating high-severity incidents (severity='high'):
+        1. Create the incident record using the incidents_db tool
+        2. After successful creation, use send_alert_email to notify admin@acme.com
+        3. Email format:
+           - Recipient: admin@acme.com
+           - Subject: [ALERT] High Priority: {incident_title}
+           - Body: Include incident_id, severity, type, title, and description
+\`\`\`
+
+---
+
+## Troubleshooting
+
+### SAM Won't Start / IncidentResponseAgent Fails to Load
+
+**Symptom:** SAM shuts down immediately after startup, or logs show:
+\`\`\`
+ERROR ... Failed to load tool config ... EmailTool ... cannot import name 'types' from 'google.adk'
+ERROR ... IncidentResponseAgent ... Error during async initialization
+\`\`\`
+
+**Cause:** The \`EmailTool\` has an incorrect import statement.
+
+**Fix:** Verify that \`/acme-retail/infrastructure/email_tool.py\` has the **correct import**:
+
+\`\`\`python
+# CORRECT:
+from google.genai import types as adk_types
+
+# WRONG (will cause ImportError):
+from google.adk import types as adk_types
+\`\`\`
+
+If you see the wrong import, update it to use \`google.genai\` instead of \`google.adk\`.
+
+---
+
+### Scheduler Service Error During Shutdown
+
+**Symptom:** When SAM shuts down, you see:
+\`\`\`
+ERROR ... Error stopping scheduler service: 'NoneType' object has no attribute 'call_soon_threadsafe'
+\`\`\`
+
+**Impact:** This is a **harmless cleanup error** that occurs during shutdown. It does not affect SAM operation and is not the cause of any startup failures.
+
+**Action:** Ignore this error. If SAM is shutting down unexpectedly, the real issue is likely elsewhere (check for agent initialization errors above this message in the logs).
+
+---
+
+### Email Service Not Responding
+
+**Symptom:** \`curl http://localhost:3000/health\` returns connection refused.
+
+**Fix:**
+1. Check if the service is running:
+   \`\`\`bash
+   ps aux | grep email-service
+   \`\`\`
+
+2. Check the service logs:
+   \`\`\`bash
+   cat /tmp/email-service.log
+   \`\`\`
+
+3. Restart manually if needed:
+   \`\`\`bash
+   cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/services
+   node email-service.js </dev/null >/tmp/email-service.log 2>&1 &
+   echo $! > /tmp/email-service.pid
+   \`\`\`
+
+---
+
+### Agent Doesn't Send Emails
+
+**Symptom:** High-severity incidents are created but no emails appear in the inbox.
+
+**Checklist:**
+1. ✅ Did you add the email tool to the agent's YAML configuration?
+2. ✅ Did you update the agent instruction to send emails for high-severity incidents?
+3. ✅ Is the email service running? (\`curl http://localhost:3000/health\`)
+4. ✅ Check SAM logs for tool invocation errors
+
+**Debug:**
+\`\`\`bash
+# Watch SAM logs in real-time
+tail -f /workspaces/Solace_Academy_SAM_Dev_Demo/500-Tooling-Plugins/sam/sam.log | grep -i "email\|incident"
+\`\`\`
+
+---
+
+## Reference: Complete Tutorial
+
+For the step-by-step tutorial with detailed explanations, see `/docs/FINAL_MASTER_GUIDE.md` → **Module 500: Tooling and Plugins — Mock Email Service Integration**
+
+That section includes:
+- Part 1: Observe Existing Plugins (Conceptual — 10 min)
+- Part 2: Mock Email Service Architecture (Overview — 5 min)
+- Part 3: Add Email Tool to Agent (Hands-On — 15 min)
+- Part 4: Test the Integration (Hands-On — 20 min)
+- Part 5: Observe Tool Invocation (Observational — 10 min)
+- Part 6: Production Considerations (Discussion — 10 min)
+- Troubleshooting Guide
+- Key Takeaways
+
+**Congratulations!** You're extending agent capabilities with custom tools. This is the foundation for building production-ready agentic systems! 🎉

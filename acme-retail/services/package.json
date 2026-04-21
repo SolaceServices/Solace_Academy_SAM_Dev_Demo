@@ -1,0 +1,21 @@
+{
+  "name": "acme-email-service",
+  "version": "1.0.0",
+  "description": "Mock email service for SAM Course 500 - Tooling and Plugins",
+  "main": "email-service.js",
+  "scripts": {
+    "start": "node email-service.js",
+    "test": "curl -X POST http://localhost:3000/send-email -H 'Content-Type: application/json' -d '{\"recipient\":\"test@acme.com\",\"subject\":\"Test\",\"body\":\"Test email\"}'"
+  },
+  "keywords": [
+    "email",
+    "mock",
+    "sam",
+    "tooling"
+  ],
+  "author": "Acme Retail",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

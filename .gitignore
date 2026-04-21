@@ -13,7 +13,7 @@ FINAL_MASTER_GUIDE.md
 
 # SAM runtime artifacts
 */sam/.venv/
-*/sam/node_modules/
+*/*/node_modules/
 */sam/package-lock.json
 */sam/package.json
 */sam/*.db

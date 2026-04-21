@@ -226,6 +226,55 @@ export WEB_UI_GATEWAY_DATABASE_URL="postgresql://acme:acme@localhost:5432/sam_ga
 mkdir -p /tmp/inventory-reports
 
 # ----------------------------
+# EMAIL SERVICE SETUP (Module 500)
+# ----------------------------
+EMAIL_SERVICE_DIR="/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/services"
+EMAIL_SERVICE_PID_FILE="/tmp/email-service.pid"
+
+# Stop any existing email service
+if [ -f "$EMAIL_SERVICE_PID_FILE" ]; then
+  OLD_PID=$(cat "$EMAIL_SERVICE_PID_FILE")
+  if kill -0 "$OLD_PID" 2>/dev/null; then
+    kill "$OLD_PID" 2>/dev/null || true
+    sleep 1
+  fi
+  rm -f "$EMAIL_SERVICE_PID_FILE"
+fi
+# Force-free port 3000 in case a zombie process is still holding it
+fuser -k 3000/tcp >/dev/null 2>&1 || true
+
+# Install email service dependencies
+cd "$EMAIL_SERVICE_DIR"
+if [ ! -d "node_modules" ]; then
+  if ! npm install --silent >/dev/null 2>&1; then
+    echo "⚠️  Warning: Email service npm install had errors (may still work)"
+  fi
+fi
+
+# Start email service in background (will auto-stop when this script exits)
+node email-service.js </dev/null >/tmp/email-service.log 2>&1 &
+EMAIL_SERVICE_PID=$!
+echo $EMAIL_SERVICE_PID > "$EMAIL_SERVICE_PID_FILE"
+
+# Wait for email service to be ready
+EMAIL_SERVICE_TIMEOUT=10
+for i in $(seq 1 $EMAIL_SERVICE_TIMEOUT); do
+  if curl -fsS "http://localhost:3000/health" >/dev/null 2>&1; then
+    echo "✅ Email service running (PID: $EMAIL_SERVICE_PID)"
+    echo "   Inbox: http://localhost:3000"
+    break
+  fi
+  if [ $i -eq $EMAIL_SERVICE_TIMEOUT ]; then
+    echo "⚠️  Warning: Email service did not respond within ${EMAIL_SERVICE_TIMEOUT}s"
+    echo "   Check logs: tail -f /tmp/email-service.log"
+  fi
+  sleep 1
+done
+
+# Return to SAM directory
+cd "$SAM_DIR"
+
+# ----------------------------
 # Auto-configure Agents and Gateways
 # ----------------------------
 if ! python3 /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/scripts/auto_create_agents.py "$SAM_DIR"; then

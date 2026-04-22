@@ -109,6 +109,13 @@ if [ -f "$SAM_ENV" ]; then
   set +a
 fi
 
+# For courses without infrastructure (no PostgreSQL), strip the PostgreSQL DB
+# URL from sam/.env so the WebUI gateway falls back to its SQLite default.
+if [ -z "${INFRASTRUCTURE_DIR:-}" ] && [ -f "$SAM_ENV" ]; then
+  sed -i '/^WEB_UI_GATEWAY_DATABASE_URL=/d' "$SAM_ENV"
+  unset WEB_UI_GATEWAY_DATABASE_URL
+fi
+
 # ── Port and URL setup ────────────────────────────────────────────────────
 PORT="$(get_port)"
 UI_URL="$(build_ui_url "$PORT")"

@@ -175,6 +175,8 @@ apps:
                   description: "Plain text response with inventory data"
               required: [response]
             instruction: |
+              IMPORTANT: This is a fresh, stateless workflow step. Ignore all prior conversation history and artifacts from this session. Do not reference or depend on any previously created artifacts.
+
               Call the InventoryManagementAgent to get a complete list of all inventory items that currently have low_stock or out_of_stock status. Include the SKU, product name, current available quantity, and reorder level for each item.
 
               Provide the information as plain text in the response field.
@@ -198,6 +200,8 @@ apps:
                   description: "Plain text response with incident data"
               required: [response]
             instruction: |
+              IMPORTANT: This is a fresh, stateless workflow step. Ignore all prior conversation history and artifacts from this session. Do not reference or depend on any previously created artifacts.
+
               Call the IncidentResponseAgent to get a complete list of all incidents with status 'open' or 'investigating'. Include the incident ID, type, severity, status, and a brief description for each incident.
 
               Provide the information as plain text in the response field.
@@ -221,6 +225,8 @@ apps:
                   description: "Plain text response with blocked order data"
               required: [response]
             instruction: |
+              IMPORTANT: This is a fresh, stateless workflow step. Ignore all prior conversation history and artifacts from this session. Do not reference or depend on any previously created artifacts.
+
               Call the OrderFulfillmentAgent to get a complete list of all orders currently in 'blocked' status. Include the order ID, customer ID, and the reason the order is blocked.
 
               Provide the information as plain text in the response field.

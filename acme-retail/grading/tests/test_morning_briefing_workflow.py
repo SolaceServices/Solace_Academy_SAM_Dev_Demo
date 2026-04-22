@@ -17,24 +17,10 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from framework.result import ResultCollector
-
-
-# ── ANSI helpers ───────────────────────────────────────────────────────────
-def _s(text: str, *codes: str) -> str:
-    """Style text with ANSI codes if stdout is a TTY."""
-    if sys.stdout.isatty():
-        return f"\033[{';'.join(codes)}m{text}\033[0m"
-    return text
-
-def _bold(t): return _s(t, "1")
-def _dim(t): return _s(t, "2")
-def _cyan(t): return _s(t, "36")
-def _green(t): return _s(t, "32")
-def _yellow(t): return _s(t, "33")
-def _red(t): return _s(t, "31")
-def _bold_cyan(t): return _s(t, "1", "36")
-def _bold_green(t): return _s(t, "1", "32")
-def _bold_red(t): return _s(t, "1", "31")
+from tests.test_utils import (
+    _s, _bold, _dim, _cyan, _green, _yellow, _red,
+    _bold_cyan, _bold_green, _bold_red,
+)
 
 
 # ── Constants ──────────────────────────────────────────────────────────────
@@ -253,7 +239,7 @@ def run_tests(student_email="student@example.com"):
     W = 62
     print()
     print(_s("═" * W, "1", "36"))
-    print(_s("  Morning Briefing Workflow  —  Test Suite", "1"))
+    print(_s("  Morning Briefing Workflow", "1"))
     print(_s("═" * W, "1", "36"))
     print()
     

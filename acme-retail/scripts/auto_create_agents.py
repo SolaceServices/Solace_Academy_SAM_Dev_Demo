@@ -1167,9 +1167,9 @@ apps:
 
         # Error handler — publishes failures for observability
         - name: "error_handler"
-      topic_expression: "static:acme/inventory/errors"
-      payload_format: "json"
-      payload_expression: "task_response:text"'''
+          topic_expression: "static:acme/inventory/errors"
+          payload_format: "json"
+          payload_expression: "task_response:text"'''
     if create_file(str(gateways_dir / 'acme-inventory-events.yaml'), content_acme_inventory_events, 'acme-inventory-events.yaml'):
         created += 1
 

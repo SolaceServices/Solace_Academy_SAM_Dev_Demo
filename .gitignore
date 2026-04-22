@@ -3,9 +3,10 @@
 .env.config
 */sam/.env
 
-# AI assistant context file
+# Context files
 CLAUDE.md
 FINAL_MASTER_GUIDE.md
+/docs/
 
 # SAM student-created configs (each student builds these themselves)
 */sam/configs/
@@ -14,7 +15,7 @@ FINAL_MASTER_GUIDE.md
 # SAM runtime artifacts
 */sam/.venv/
 */*/node_modules/
-*package-lock.json
+*/*/package-lock.json
 */sam/package.json
 */sam/*.db
 */sam/*.db-shm
@@ -27,7 +28,6 @@ FINAL_MASTER_GUIDE.md
 
 # Infrastructure (MCP servers, external agents, docker-compose)
 acme-retail/infrastructure/node_modules/
-acme-retail/infrastructure/package-lock.json
 acme-retail/infrastructure/logistics_agent/__pycache__/
 acme-retail/infrastructure/logistics_agent/.deps_installed
 

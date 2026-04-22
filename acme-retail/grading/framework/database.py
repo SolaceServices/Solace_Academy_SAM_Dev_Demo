@@ -105,28 +105,6 @@ def fetch_incident(incident_id: str, dsn: Optional[str] = None) -> Optional[dict
         return dict(row) if row else None
 
 
-def fetch_incidents_for_order(order_id: str, dsn: Optional[str] = None) -> list[dict]:
-    """Return all incidents linked to *order_id*."""
-    with db_cursor(dsn) as cur:
-        cur.execute(
-            "SELECT * FROM incidents WHERE order_id = %s",
-            (order_id,),
-        )
-        return [dict(r) for r in cur.fetchall()]
-
-
-def fetch_incidents_for_shipment(
-    shipment_id: str, dsn: Optional[str] = None
-) -> list[dict]:
-    """Return all incidents linked to *shipment_id*."""
-    with db_cursor(dsn) as cur:
-        cur.execute(
-            "SELECT * FROM incidents WHERE shipment_id = %s",
-            (shipment_id,),
-        )
-        return [dict(r) for r in cur.fetchall()]
-
-
 def row_count(table: str, where: str = "", params=(), dsn: Optional[str] = None) -> int:
     """
     Return the number of rows in *table* matching an optional WHERE clause.

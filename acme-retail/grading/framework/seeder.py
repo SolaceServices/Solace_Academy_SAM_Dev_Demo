@@ -18,7 +18,10 @@ _DEFAULT_SEEDER_PATH = os.environ.get(
     "/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/scripts/seed_orders_db.py",
 )
 
-# SAM working directory — where agent session .db files are created
+# SAM working directory — where agent session .db files are created.
+# REQUIRED: export SAM_DIR before running tests from modules 400 or 500.
+# run-scenario.sh exports SAM_DIR per module. If running tests manually,
+# set: export SAM_DIR=/workspaces/Solace_Academy_SAM_Dev_Demo/<module>/sam
 _DEFAULT_SAM_DIR = os.environ.get(
     "SAM_DIR",
     "/workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents/sam",
@@ -217,13 +220,22 @@ def full_reset(
     full_reset()  →  clean, deterministic seed state every time.
 
     Process:
-    1. Drain stale messages from previous suite's in-flight pipelines
-    2. Reset database to seed state
-    3. Drain again to catch any pipelines that responded during the reset
-    4. Clear agent session DBs
+    1. Drain stale messages and reset database concurrently
+       (drain discards in-flight pipeline messages while the DB resets)
+    2. Short drain to catch any messages that arrived during the reset
+    3. Clear agent session DBs
     """
-    _drain_broker_topics()
-    reset_to_seed(seeder_path=seeder_path, dsn=dsn, timeout_s=timeout_s)
-    _drain_broker_topics(idle_s=5.0, max_wait_s=15.0)
+    import concurrent.futures as _cf
+    with _cf.ThreadPoolExecutor(max_workers=2) as pool:
+        drain_future = pool.submit(_drain_broker_topics)
+        reset_future = pool.submit(
+            reset_to_seed,
+            seeder_path=seeder_path,
+            dsn=dsn,
+            timeout_s=timeout_s,
+        )
+        drain_future.result()
+        reset_future.result()
+    _drain_broker_topics(idle_s=2.0, max_wait_s=10.0)
     _clear_agent_session_dbs(sam_dir)
     _clear_email_inbox()

@@ -34,6 +34,7 @@ def execute_query(sql: str, params: tuple = ()) -> List[Dict]:
 
 def execute_update(sql: str, params: tuple = ()) -> int:
     """Execute an INSERT/UPDATE/DELETE and return rows affected."""
+    conn = None
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -44,7 +45,8 @@ def execute_update(sql: str, params: tuple = ()) -> int:
         conn.close()
         return rows_affected
     except Exception as e:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         raise Exception(f"Update error: {str(e)}")
 
 
@@ -189,38 +191,35 @@ def get_delayed_shipments() -> List[Dict]:
 def create_shipment(
     shipment_id: str,
     order_id: str,
-    carrier_id: str,
-    carrier_name: str,
+    carrier: str,
     tracking_number: str,
     service_level: str,
-    origin_facility: str,
-    destination_city: str,
-    destination_state: str,
-    weight_lbs: float,
+    dest_city: str,
+    dest_state: str,
     estimated_delivery: datetime
 ) -> bool:
     """Create a new shipment and log initial event."""
     sql = """
     INSERT INTO shipments (
-        shipment_id, order_id, carrier_id, carrier_name, tracking_number,
-        service_level, origin_facility, destination_city, destination_state,
-        weight_lbs, ship_date, estimated_delivery, current_status
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        shipment_id, order_id, carrier, tracking_number,
+        service_level, dest_city, dest_state,
+        ship_date, estimated_delivery, status
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
-    
+
     execute_update(sql, (
-        shipment_id, order_id, carrier_id, carrier_name, tracking_number,
-        service_level, origin_facility, destination_city, destination_state,
-        weight_lbs, datetime.now(), estimated_delivery, 'created'
+        shipment_id, order_id, carrier, tracking_number,
+        service_level, dest_city, dest_state,
+        datetime.now(), estimated_delivery, 'created'
     ))
-    
+
     log_shipment_event(
         shipment_id,
         event_type='created',
         event_timestamp=datetime.now(),
         event_details={'message': 'Shipment created and ready for pickup'}
     )
-    
+
     return True
 
 
@@ -269,10 +268,11 @@ def log_shipment_event(
     ) VALUES (%s, %s, %s, %s, %s)
     RETURNING id
     """
-    
+
     # Use event_type as status, and event_details as description
     description = json.dumps(event_details) if event_details else event_type
-    
+
+    conn = None
     try:
         conn = get_db_connection()
         cur = conn.cursor()

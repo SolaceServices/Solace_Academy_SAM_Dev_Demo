@@ -114,18 +114,18 @@ scenario_order_fulfillment() {
         "📦"
     sleep 2
 
-    # ── Step 4: Shipment delay — agent should update DB and create incident
-    echo -e "${YELLOW}Step 4: Shipment delay — should UPDATE shipment and CREATE incident${NC}"
+    # ── Step 4: Shipment delay — agent updates order estimated_delivery; IncidentResponseAgent creates incident via acme/logistics/updated
+    echo -e "${YELLOW}Step 4: Shipment delay — should UPDATE order estimated_delivery (incident handled by IncidentResponseAgent)${NC}"
     publish_event "acme/logistics/shipment-delayed" \
         "{\"tracking_number\":\"1Z999AA10123456791\",\"delay_hours\":24,\"carrier\":\"ExpressAir Priority\",\"timestamp\":$(get_timestamp)}" \
         "🚚"
 
     echo ""
     echo -e "${GREEN}✅ Expected outcomes:${NC}"
-    echo -e "${GREEN}   Step 1 → acme/orders/fulfillment-result/validated${NC}"
-    echo -e "${GREEN}   Step 2 → acme/orders/fulfillment-result/blocked${NC}"
-    echo -e "${GREEN}   Step 3 → acme/orders/fulfillment-result/validated (ORD-2026-004 unblocked)${NC}"
-    echo -e "${GREEN}   Step 4 → acme/incidents/created (SHIP-2026-0048 / ORD-2026-005)${NC}"
+    echo -e "${GREEN}   Step 1 → acme/orders/decision (validated)${NC}"
+    echo -e "${GREEN}   Step 2 → acme/orders/decision (blocked)${NC}"
+    echo -e "${GREEN}   Step 3 → acme/orders/decision (ORD-2026-004 unblocked/validated)${NC}"
+    echo -e "${GREEN}   Step 4 → acme/orders/decision (ETA updated); acme/incidents/created via IncidentResponseAgent${NC}"
     print_summary
 }
 

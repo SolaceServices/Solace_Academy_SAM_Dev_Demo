@@ -40,7 +40,7 @@ SAM_AGENT_NAME = "AcmeKnowledge"
 EXPECTED_DOCS = {
     "employee_handbook.md": ["employee", "handbook", "policy"],
     "refund_policy.md": ["refund", "return", "policy"],
-    "shipping_proceedures.md": ["shipping", "carrier", "delivery"],
+    "shipping_procedures.md": ["shipping", "carrier", "delivery"],
 }
 
 AGENT_TIMEOUT_S = 25

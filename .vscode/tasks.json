@@ -31,7 +31,7 @@
       "type": "shell",
       "command": "/workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents/sam/.venv/bin/python3 evaluate_project.py",
       "options": {
-        "cwd": "/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/grading/tests"
+        "cwd": "/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/tests/test_suites"
       },
       "problemMatcher": [],
       "presentation": {

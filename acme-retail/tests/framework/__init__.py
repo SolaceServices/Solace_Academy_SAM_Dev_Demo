@@ -1,5 +1,5 @@
 """
-Acme Retail SAM Course grading framework.
+Acme Retail SAM Course tests framework.
 
 Modules:
   broker   — Solace publish/subscribe helpers (BrokerClient, broker_session)

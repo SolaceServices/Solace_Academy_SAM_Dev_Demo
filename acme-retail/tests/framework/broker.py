@@ -1,5 +1,5 @@
 """
-broker.py — Solace PubSub+ publish/subscribe helpers for the grading framework.
+broker.py — Solace PubSub+ publish/subscribe helpers for the tests framework.
 
 Wraps the solace-pubsubplus Python SDK to provide:
   - BrokerClient: a context-manager-friendly connection to the local SAM broker

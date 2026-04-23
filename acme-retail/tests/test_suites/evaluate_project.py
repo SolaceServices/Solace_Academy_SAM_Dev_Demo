@@ -12,7 +12,7 @@ import animations
 
 def main():
     """Run all tests in parallel with animation overlay."""
-    grading_dir = Path(__file__).parent
+    tests_dir = Path(__file__).parent
     
     # Ensure pytest-xdist is installed
     subprocess.run(
@@ -29,14 +29,14 @@ def main():
         result = subprocess.run(
             [
                 sys.executable, "-m", "pytest",
-                str(grading_dir / "tests"),
+                str(tests_dir / "test_suites"),
                 "-n", "auto",
                 "-v",
                 "--tb=short",
-                "--junit-xml", str(grading_dir / "test_results.xml"),
+                "--junit-xml", str(tests_dir / "test_results.xml"),
                 "--color=yes"
             ],
-            cwd=str(grading_dir),
+            cwd=str(tests_dir),
             capture_output=True,
             text=True
         )

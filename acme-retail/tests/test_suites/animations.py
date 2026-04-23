@@ -2,8 +2,8 @@
 """
 evaluate_project.py  —  Acme Retail Full Retail Day Grading Animation
 ======================================================================
-Location:  acme-retail/grading/tests/evaluate_project.py
-Run from:  acme-retail/grading/tests/
+Location:  acme-retail/tests/test_suites/evaluate_project.py
+Run from:  acme-retail/tests/test_suites/
 Command:   python3 evaluate_project.py
 """
 
@@ -13,10 +13,10 @@ import curses, subprocess, threading, queue, time, sys, os, re, math
 # CONFIG
 # ---------------------------------------------------------------------------
 SUITES = [
-    ("Order Fulfillment",    "tests.test_order_fulfillment",    13),
-    ("Inventory Management", "tests.test_inventory_management",  7),
-    ("Incident Response",    "tests.test_incident_response",     8),
-    ("Company Policies",     "tests.test_knowledge_query",        6),
+    ("Order Fulfillment",    "test_suites.test_order_fulfillment",    13),
+    ("Inventory Management", "test_suites.test_inventory_management",  7),
+    ("Incident Response",    "test_suites.test_incident_response",     8),
+    ("Company Policies",     "test_suites.test_knowledge_query",        6),
 ]
 
 VENV_PYTHON = '/workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents/sam/.venv/bin/python3'
@@ -44,8 +44,8 @@ def run_tests():
         EVQ.put({'type': 'all_done'})
         return
 
-    grading_dir = os.path.dirname(os.path.abspath(__file__))
-    grading_dir = os.path.dirname(grading_dir)
+    tests_dir = os.path.dirname(os.path.abspath(__file__))
+    tests_dir = os.path.dirname(tests_dir)
     py = VENV_PYTHON if os.path.exists(VENV_PYTHON) else sys.executable
 
     for name, module, checks in SUITES:
@@ -53,7 +53,7 @@ def run_tests():
         try:
             proc = subprocess.run(
                 [py, '-m', module, '-v'],
-                cwd=grading_dir, capture_output=True, text=True, timeout=300,
+                cwd=tests_dir, capture_output=True, text=True, timeout=300,
             )
             passed = (proc.returncode == 0)
         except Exception:

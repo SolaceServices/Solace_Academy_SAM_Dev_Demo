@@ -1,5 +1,5 @@
 """
-database.py — PostgreSQL assertion helpers for the grading framework.
+database.py — PostgreSQL assertion helpers for the tests framework.
 
 Connects to the Acme orders database (seeded by seed_orders_db.py) and
 provides helpers to assert on row state after agent actions.

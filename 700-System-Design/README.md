@@ -434,7 +434,7 @@ rate_limit:
 
 ### Testing
 
-- [ ] Run full test suite (all 5 grading tests)
+- [ ] Run full test suite (all 5 tests)
 - [ ] Perform load testing (100x normal traffic)
 - [ ] Test failover scenarios (agent crashes, DB outages)
 - [ ] Validate error handling (network failures, LLM timeouts)

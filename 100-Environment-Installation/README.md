@@ -117,11 +117,11 @@ Each numbered directory maps to a specific course:
 You'll work inside the directory that corresponds to the course you're taking.
 
 ### 3. Supporting Assets
-- `acme-retail/` — Shared data, scripts, grading tests, documentation
+- `acme-retail/` — Shared data, scripts, tests, documentation
   - `data/knowledge/` — Documents for the RAG agent
   - `data/seed-data/` — PostgreSQL seed data (orders, inventory, incidents, logistics)
   - `scripts/` — Setup and automation scripts
-  - `grading/` — Automated grading framework
+  - `tests/` — Automated tests framework
   - `infrastructure/` — Docker services, MCP servers, external agents
 - `.env.config` — Shared environment variables (gitignored)
 

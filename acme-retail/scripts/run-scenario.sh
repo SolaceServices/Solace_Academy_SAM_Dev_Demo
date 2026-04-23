@@ -52,32 +52,32 @@ SAM_DIR=$(_detect_sam_dir)
 
 case "$1" in
   --test-order-fulfillment)
-    cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/grading
-    exec "${SAM_DIR}/.venv/bin/python" -m tests.test_order_fulfillment_parallel
+    cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/tests
+    exec "${SAM_DIR}/.venv/bin/python" -m test_suites.test_order_fulfillment_parallel
     ;;
   --test-inventory-management)
-    cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/grading
-    exec "${SAM_DIR}/.venv/bin/python" -m tests.test_inventory_management_parallel
+    cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/tests
+    exec "${SAM_DIR}/.venv/bin/python" -m test_suites.test_inventory_management_parallel
     ;;
   --test-incident-response)
-    cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/grading
-    exec "${SAM_DIR}/.venv/bin/python" -m tests.test_incident_response_parallel
+    cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/tests
+    exec "${SAM_DIR}/.venv/bin/python" -m test_suites.test_incident_response_parallel
     ;;
   --test-knowledge-query)
-    cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/grading
-    exec "${SAM_DIR}/.venv/bin/python" -m tests.test_knowledge_query_parallel
+    cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/tests
+    exec "${SAM_DIR}/.venv/bin/python" -m test_suites.test_knowledge_query_parallel
     ;;
   --test-logistics)
-    cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/grading
-    exec "${SAM_DIR}/.venv/bin/python" -m tests.test_logistics_parallel
+    cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/tests
+    exec "${SAM_DIR}/.venv/bin/python" -m test_suites.test_logistics_parallel
     ;;
   --test-morning-briefing-workflow)
-    cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/grading
-    exec "${SAM_DIR}/.venv/bin/python" -m tests.test_morning_briefing_workflow
+    cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/tests
+    exec "${SAM_DIR}/.venv/bin/python" -m test_suites.test_morning_briefing_workflow
     ;;
   --test-email-tool)
-    cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/grading
-    exec "${SAM_DIR}/.venv/bin/python" -m tests.test_email_tool_parallel
+    cd /workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/tests
+    exec "${SAM_DIR}/.venv/bin/python" -m test_suites.test_email_tool_parallel
     ;;
   *)
     exec bash ./simulate-events.sh "$@"

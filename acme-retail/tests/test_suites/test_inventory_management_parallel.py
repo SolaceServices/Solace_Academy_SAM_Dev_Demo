@@ -17,7 +17,7 @@ from framework.broker import BrokerClient
 from framework.result import ResultCollector
 from framework.database import assert_inventory_status, assert_field_equals
 from framework.seeder import full_reset
-from tests.test_utils import (
+from test_suites.test_utils import (
     _s, _bold, _dim, _cyan, _green, _yellow, _red,
     _bold_cyan, _bold_green, _bold_red,
     _visual_width, TestInfo, ProgressTable, QuietSpinner,

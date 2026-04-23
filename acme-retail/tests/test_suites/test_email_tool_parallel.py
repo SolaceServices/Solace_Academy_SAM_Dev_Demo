@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from framework.broker import BrokerClient
 from framework.result import ResultCollector
 from framework.seeder import full_reset
-from tests.test_utils import (
+from test_suites.test_utils import (
     _s, _bold, _dim, _cyan, _green, _yellow, _red,
     _bold_cyan, _bold_green, _bold_red,
     _visual_width, TestInfo, ProgressTable, QuietSpinner,

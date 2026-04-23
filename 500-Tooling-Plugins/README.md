@@ -41,7 +41,7 @@ bash 500-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/500-Tooling-Plugins
 ✅ Sets up Solace broker, PostgreSQL, and all agents from Module 300  
 ✅ **Starts mock email service** on port 3000 (background process)  
 ✅ **Installs npm dependencies** for the email service (Express.js)  
-✅ **Creates Python email tool wrapper** at \`/acme-retail/infrastructure/email_tool.py\`  
+✅ **Creates Python email tool wrapper** at \`/acme-retail/services/email_tool.py\`  
 ✅ **Enables scheduler service** in WebUI gateway (for scheduled tasks)  
 ✅ Seeds test incident data
 
@@ -170,7 +170,7 @@ For the complete hands-on walkthrough, learning activities, and production migra
       # NEW: Email alert tool (Module 500)
       - tool_type: python
         component_module: "email_tool"
-        component_base_path: "/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/infrastructure"
+        component_base_path: "/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/services"
         class_name: "EmailTool"
         tool_config:
           service_url: "http://localhost:3000"
@@ -204,7 +204,7 @@ ERROR ... IncidentResponseAgent ... Error during async initialization
 
 **Cause:** The \`EmailTool\` has an incorrect import statement.
 
-**Fix:** Verify that \`/acme-retail/infrastructure/email_tool.py\` has the **correct import**:
+**Fix:** Verify that \`/acme-retail/services/email_tool.py\` has the **correct import**:
 
 \`\`\`python
 # CORRECT:

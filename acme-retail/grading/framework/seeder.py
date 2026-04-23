@@ -206,6 +206,71 @@ def _clear_email_inbox(url: str = "http://localhost:3000/clear"):
         pass  # non-fatal — email service may not be running for this module
 
 
+_SEMP_BASE = os.environ.get("SEMP_BASE_URL", "http://localhost:8080/SEMP/v2")
+_SEMP_USER = os.environ.get("SEMP_USERNAME", "admin")
+_SEMP_PASS = os.environ.get("SEMP_PASSWORD", "admin")
+_SEMP_VPN  = os.environ.get("SEMP_MSG_VPN", "default")
+
+# Queue name fragment that identifies SAM event-handler durable input queues.
+# These accumulate stale messages between test runs and must be purged so
+# agents process new test messages immediately (not behind a backlog).
+_EVENT_HANDLER_QUEUE_PREFIX = "/event-mesh-gw/data/"
+
+
+def _purge_event_handler_queues():
+    """
+    Purge all stale messages from SAM gateway event-handler durable input
+    queues using the Solace SEMP v2 action API.
+
+    Without this, QoS-1 messages from previous test runs accumulate in the
+    durable queues.  Serial agents (e.g. LogisticsAgent at ~40 s/request)
+    will process the entire backlog before reaching the new test's message,
+    causing subscriber timeouts even when AGENT_TIMEOUT_S is generous.
+
+    Non-fatal: if SEMP is unreachable or returns an error we log and continue.
+    """
+    import urllib.request
+    import urllib.parse
+    import urllib.error
+    import base64
+
+    auth = base64.b64encode(f"{_SEMP_USER}:{_SEMP_PASS}".encode()).decode()
+    headers = {"Content-Type": "application/json", "Authorization": f"Basic {auth}"}
+
+    # 1. List all queues in the VPN
+    list_url = f"{_SEMP_BASE}/monitor/msgVpns/{_SEMP_VPN}/queues?count=100"
+    try:
+        req = urllib.request.Request(list_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            import json as _json
+            queues = _json.loads(resp.read()).get("data", [])
+    except Exception as exc:
+        print(f"  ⚠️  Warning: could not list queues via SEMP: {exc}")
+        return
+
+    # 2. Purge each event-handler queue
+    purged = 0
+    for q in queues:
+        name = q.get("queueName", "")
+        if _EVENT_HANDLER_QUEUE_PREFIX not in name:
+            continue
+        encoded = urllib.parse.quote(name, safe="")
+        action_url = (
+            f"{_SEMP_BASE}/action/msgVpns/{_SEMP_VPN}/queues/{encoded}/deleteMsgs"
+        )
+        try:
+            req = urllib.request.Request(
+                action_url, data=b"{}", method="PUT", headers=headers
+            )
+            with urllib.request.urlopen(req, timeout=10):
+                pass
+            purged += 1
+        except urllib.error.HTTPError as exc:
+            print(f"  ⚠️  Warning: could not purge queue {name[-50:]}: HTTP {exc.code}")
+        except Exception as exc:
+            print(f"  ⚠️  Warning: could not purge queue {name[-50:]}: {exc}")
+
+
 def full_reset(
     seeder_path: str = _DEFAULT_SEEDER_PATH,
     dsn: str = None,
@@ -220,22 +285,18 @@ def full_reset(
     full_reset()  →  clean, deterministic seed state every time.
 
     Process:
-    1. Drain stale messages and reset database concurrently
-       (drain discards in-flight pipeline messages while the DB resets)
-    2. Short drain to catch any messages that arrived during the reset
-    3. Clear agent session DBs
+    1. Drain stale messages — waits until broker is silent, ensuring all
+       in-flight agent pipelines from the previous run have completed and
+       committed their DB writes before the reset runs.
+    2. Reset database to seed state.
+    3. Drain again to discard any pipeline responses triggered during reset.
+    4. Clear agent session DBs.
+    5. Purge event-handler durable queues to eliminate stale-message backlog.
     """
-    import concurrent.futures as _cf
-    with _cf.ThreadPoolExecutor(max_workers=2) as pool:
-        drain_future = pool.submit(_drain_broker_topics)
-        reset_future = pool.submit(
-            reset_to_seed,
-            seeder_path=seeder_path,
-            dsn=dsn,
-            timeout_s=timeout_s,
-        )
-        drain_future.result()
-        reset_future.result()
-    _drain_broker_topics(idle_s=2.0, max_wait_s=10.0)
+    _drain_broker_topics()
+    reset_to_seed(seeder_path=seeder_path, dsn=dsn, timeout_s=timeout_s)
+    _drain_broker_topics(idle_s=5.0, max_wait_s=15.0)
+    reset_extra_rows(dsn=dsn)
     _clear_agent_session_dbs(sam_dir)
     _clear_email_inbox()
+    _purge_event_handler_queues()

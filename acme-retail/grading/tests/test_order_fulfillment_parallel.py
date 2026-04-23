@@ -10,7 +10,6 @@ import json
 import time
 import threading
 import concurrent.futures
-from typing import Dict, List
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -87,6 +86,7 @@ def test_1_in_stock_order(results: ResultCollector, lock: threading.Lock, progre
             pub_topic=TOPIC_ORDER_CREATED,
             pub_payload=_new_order_payload(order_id, IN_STOCK_SKU, IN_STOCK_NAME, IN_STOCK_PRICE),
             predicate=lambda m: order_id in json.dumps(m),
+            timeout_s=AGENT_TIMEOUT_S,
         )
     except Exception as exc:
         progress.update_status(test_num, "❌", time.monotonic() - start)
@@ -126,6 +126,7 @@ def test_2_out_of_stock_order(results: ResultCollector, lock: threading.Lock, pr
             pub_topic=TOPIC_ORDER_CREATED,
             pub_payload=_new_order_payload(order_id, OOS_SKU, OOS_NAME, OOS_PRICE),
             predicate=lambda m: order_id in json.dumps(m),
+            timeout_s=AGENT_TIMEOUT_S,
         )
     except Exception as exc:
         progress.update_status(test_num, "❌", time.monotonic() - start)
@@ -173,6 +174,7 @@ def test_3_inventory_restock(results: ResultCollector, lock: threading.Lock, pro
                 "new_status": "in_stock",
             },
             predicate=lambda m: BLOCKED_ORDER_ID in json.dumps(m),
+            timeout_s=AGENT_TIMEOUT_S,
         )
     except Exception as exc:
         progress.update_status(test_num, "❌", time.monotonic() - start)
@@ -218,6 +220,7 @@ def test_4_shipment_delay(results: ResultCollector, lock: threading.Lock, progre
                 "delay_hours": 30,
             },
             predicate=lambda m: DELAYED_ORDER_ID in json.dumps(m) or DELAYED_SHIPMENT_ID in json.dumps(m),
+            timeout_s=AGENT_TIMEOUT_S,
         )
     except Exception as exc:
         progress.update_status(test_num, "❌", time.monotonic() - start)
@@ -259,6 +262,7 @@ def test_5_order_cancelled(results: ResultCollector, lock: threading.Lock, progr
                 "cancelled_by": "customer",
             },
             predicate=lambda m: CANCEL_ORDER_ID in json.dumps(m),
+            timeout_s=AGENT_TIMEOUT_S,
         )
     except Exception as exc:
         progress.update_status(test_num, "❌", time.monotonic() - start)

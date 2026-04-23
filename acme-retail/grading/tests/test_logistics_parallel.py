@@ -10,7 +10,6 @@ import json
 import time
 import threading
 import concurrent.futures
-from typing import List
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -96,26 +95,14 @@ def test_1_update_shipment_status(results: ResultCollector, lock: threading.Lock
 
     time.sleep(POST_MSG_SLEEP_S)
 
-    # Retry to handle stale broker message arriving before the real pipeline commits to DB.
-    # A QoS-1 queued event from the previous test run can trigger check 1 early; the new
-    # pipeline may still be in-flight when the sleep expires.  Retry up to 5×3s = 15s extra.
-    last_status_exc = None
-    for attempt in range(5):
-        try:
-            assert_shipment_status(STATUS_SHIPMENT_ID, STATUS_NEW_STATUS)
-            last_status_exc = None
-            break
-        except Exception as e:
-            last_status_exc = e
-            if attempt < 4:
-                time.sleep(3)
-
     event_count_after = shipment_event_count(STATUS_SHIPMENT_ID)
 
     with lock:
         with results.test("t1_status_updated", label=f"{STATUS_SHIPMENT_ID} status updated to '{STATUS_NEW_STATUS}'"):
-            if last_status_exc:
-                assert False, str(last_status_exc)
+            try:
+                assert_shipment_status(STATUS_SHIPMENT_ID, STATUS_NEW_STATUS)
+            except Exception as exc:
+                assert False, str(exc)
 
         with results.test("t1_event_logged", label=f"New shipment_event logged for {STATUS_SHIPMENT_ID}"):
             assert event_count_after > event_count_before, (

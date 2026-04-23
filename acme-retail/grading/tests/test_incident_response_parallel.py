@@ -11,7 +11,6 @@ import time
 import threading
 import concurrent.futures
 import psycopg2
-from typing import Dict, List
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -76,6 +75,7 @@ def test_1_blocked_order_creates_incident(results: ResultCollector, lock: thread
                 ),
             },
             predicate=lambda msg: "inventory_shortage" in json.dumps(msg).lower(),
+            timeout_s=AGENT_TIMEOUT_S,
         )
     except Exception as exc:
         progress.update_status(test_num, "❌", time.monotonic() - start)
@@ -192,6 +192,7 @@ def test_3_inventory_restock_updates_incident(results: ResultCollector, lock: th
                 "new_status": "in_stock",
             },
             predicate=lambda msg: HIGH_SEV_INCIDENT_ID in json.dumps(msg),
+            timeout_s=AGENT_TIMEOUT_S,
         )
     except Exception as exc:
         progress.update_status(test_num, "❌", time.monotonic() - start)
@@ -239,6 +240,7 @@ def test_4_inventory_error_creates_incident(results: ResultCollector, lock: thre
                 "timestamp": "2026-04-02T12:00:00Z",
             },
             predicate=lambda msg: "system_error" in json.dumps(msg).lower(),
+            timeout_s=AGENT_TIMEOUT_S,
         )
     except Exception as exc:
         progress.update_status(test_num, "❌", time.monotonic() - start)
@@ -291,6 +293,7 @@ def test_5_shipment_delay_creates_incident(results: ResultCollector, lock: threa
                 "delay_reason": "Weather conditions affecting air transport",
             },
             predicate=lambda msg: TEST5_SHIPMENT_ID in json.dumps(msg),
+            timeout_s=AGENT_TIMEOUT_S,
         )
     except Exception as exc:
         progress.update_status(test_num, "❌", time.monotonic() - start)

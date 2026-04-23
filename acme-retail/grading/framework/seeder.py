@@ -249,7 +249,6 @@ def _purge_event_handler_queues():
         return
 
     # 2. Purge each event-handler queue
-    purged = 0
     for q in queues:
         name = q.get("queueName", "")
         if _EVENT_HANDLER_QUEUE_PREFIX not in name:
@@ -264,7 +263,6 @@ def _purge_event_handler_queues():
             )
             with urllib.request.urlopen(req, timeout=10):
                 pass
-            purged += 1
         except urllib.error.HTTPError as exc:
             print(f"  ⚠️  Warning: could not purge queue {name[-50:]}: HTTP {exc.code}")
         except Exception as exc:

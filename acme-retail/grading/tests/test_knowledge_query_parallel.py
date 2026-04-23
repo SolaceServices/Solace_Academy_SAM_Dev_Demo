@@ -12,7 +12,6 @@ import threading
 import concurrent.futures
 import urllib.request
 import urllib.parse
-from typing import List
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

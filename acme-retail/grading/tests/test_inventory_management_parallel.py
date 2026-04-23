@@ -10,7 +10,6 @@ import json
 import time
 import threading
 import concurrent.futures
-from typing import Dict, List
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -69,6 +68,7 @@ def test_1_restock_oos_to_instock(results: ResultCollector, lock: threading.Lock
                 "supplier_name": OOS_SUPPLIER,
             },
             predicate=lambda m: OOS_SKU in json.dumps(m),
+            timeout_s=AGENT_TIMEOUT_S,
         )
     except Exception as exc:
         progress.update_status(test_num, "❌", time.monotonic() - start)
@@ -118,6 +118,7 @@ def test_2_writeoff_low_to_oos(results: ResultCollector, lock: threading.Lock, p
                 "reason": "Damaged during warehouse inspection",
             },
             predicate=lambda m: LOW_SKU in json.dumps(m),
+            timeout_s=AGENT_TIMEOUT_S,
         )
     except Exception as exc:
         progress.update_status(test_num, "❌", time.monotonic() - start)
@@ -167,6 +168,7 @@ def test_3_restock_after_writeoff(results: ResultCollector, lock: threading.Lock
                 "supplier_name": "Cable Connections Inc",
             },
             predicate=lambda m: OOS_SKU_2 in json.dumps(m),
+            timeout_s=AGENT_TIMEOUT_S,
         )
     except Exception as exc:
         progress.update_status(test_num, "❌", time.monotonic() - start)

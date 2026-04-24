@@ -13,7 +13,6 @@ import os
 import json
 import time
 import threading
-import concurrent.futures
 import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -228,9 +227,11 @@ def run_tests(student_email="student@example.com"):
     ]
 
     start_time = time.monotonic()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        futures = [executor.submit(fn, *args) for fn, *args in test_functions]
-        concurrent.futures.wait(futures)
+    # Tests run sequentially: Test 2 checks for *no new* email, so it must
+    # baseline after Test 1 has already sent its email, otherwise the inbox
+    # count from Test 1 races into Test 2's delta check.
+    for fn, *args in test_functions:
+        fn(*args)
 
     progress.stop()
     elapsed = time.monotonic() - start_time

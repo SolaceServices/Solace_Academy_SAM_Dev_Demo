@@ -173,6 +173,7 @@ For the complete hands-on walkthrough, learning activities, and production migra
         component_base_path: "/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/services"
         class_name: "EmailTool"
         tool_config:
+          tool_name: "send_alert_email"
           service_url: "http://localhost:3000"
 \`\`\`
 

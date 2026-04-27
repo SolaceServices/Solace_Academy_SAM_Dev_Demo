@@ -24,17 +24,18 @@ class EmailTool(DynamicTool):
     def __init__(self, tool_config: Dict[str, Any]):
         """
         Initialize the email tool.
-        
+
         Args:
-            tool_config: Configuration dictionary with 'service_url' key
+            tool_config: Configuration dictionary with 'service_url' and optional 'tool_name' keys
         """
         super().__init__(tool_config)
         self.service_url = tool_config.get('service_url', 'http://localhost:3000').rstrip('/')
+        self._tool_name = tool_config.get('tool_name', 'send_alert_email')
     
     @property
     def tool_name(self) -> str:
         """Return the function name that the LLM will call."""
-        return "send_alert_email"
+        return self._tool_name
     
     @property
     def tool_description(self) -> str:

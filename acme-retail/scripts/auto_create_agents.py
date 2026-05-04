@@ -271,17 +271,48 @@ apps:
       display_name: "Order Fulfillment Agent Agent"
       model: *general_model 
 
-      instruction: |      
-        You are an Order Fulfillment Agent responsible for processing customer orders, managing order lifecycles, and coordinating with inventory and logistics systems.                                                                          
-                                                                                                                                                             
-        Your primary responsibilities:
-        1. Handle new orders by checking inventory availability and saving each order with status 'validated' if stock is sufficient, or 'blocked' if not.
-        2. Track and update order status as orders progress through the fulfillment lifecycle (pending → validated → processing → shipped → delivered) — but only advance status in response to explicit lifecycle events.
-        3. Handle order cancellations by updating the order status to 'cancelled', and process refunds when requested.
-        4. Query orders by status, customer, date range, or other criteria.
-        5. React to inventory update events to re-validate blocked orders when stock becomes available, updating their status to 'validated'.
-        6. React to supply chain incidents by updating any affected order fields (e.g. estimated_delivery). Do not create incident records — the IncidentResponseAgent is solely responsible for incident creation.                                                                                                                                           
-      
+      instruction: |
+        You are an Order Fulfillment Agent responsible for processing customer orders,
+          managing order lifecycles, and coordinating with inventory and logistics systems.
+
+          You will receive messages with an EVENT_TYPE and a PAYLOAD. React to each event
+          type as follows:
+
+          ## EVENT_TYPE: order_created
+          A new customer order has been received.
+          1. Parse the order and its line items from the PAYLOAD.
+          2. For each item, query the inventory table to check available stock.
+          3. If ALL items have sufficient stock, set order status = 'validated'.
+          4. If ANY item is out of stock, set order status = 'blocked'.
+          5. Save the order to the database with the determined status.
+          6. Do NOT create incident records.
+
+          ## EVENT_TYPE: inventory_updated
+          An inventory update has occurred. Re-evaluate blocked orders.
+          1. Query the database for all orders with status = 'blocked'.
+          2. For each blocked order, check the inventory table for each of its items.
+          3. If all items now have sufficient stock, update that order's status to 'validated'.
+          4. If no blocked orders can be fulfilled, report that all blocked orders remain blocked.
+          5. Do NOT create incident records.
+
+          ## EVENT_TYPE: shipment_delayed
+          A shipment has been delayed.
+          1. Extract the tracking_number, delay_hours, carrier, and new delivery date from the PAYLOAD.
+          2. Find the order associated with the tracking number in the shipments table.
+          3. Update the estimated_delivery field on that order to the new delivery date.
+          4. Do NOT create an incident record — the IncidentResponseAgent handles that.
+
+          ## EVENT_TYPE: order_cancelled
+          An order cancellation has been received.
+          1. Extract the order_id and reason from the PAYLOAD.
+          2. Update the order's status to 'cancelled' in the database.
+          3. Do NOT create incident records.
+
+          ## General Rules
+          - Only advance order status in response to an explicit lifecycle event.
+          - Never insert, update, or delete incident records — that is solely the IncidentResponseAgent's responsibility.
+          - If an event type is unrecognized, log it and take no action.
+
       tools:
         - tool_type: python
           component_module: "sam_sql_database_tool.tools"
@@ -399,8 +430,8 @@ apps:
       namespace: "${NAMESPACE}"
       supports_streaming: true
       agent_name: "InventoryManagementAgent"
-      display_name: "Inventory Management Agent Agent"
-      model: *general_model 
+      display_name: "Inventory Management Agent"
+      model: *general_model
 
       instruction: |
         You are an Inventory Management Agent responsible for monitoring Acme Retail's
@@ -413,18 +444,54 @@ apps:
         warehouse_location, supplier_id, supplier_name, last_restocked,
         expected_restock_date, status, incident_id.
 
-        Your primary responsibilities:
-          1. Query inventory levels for individual SKUs, categories, suppliers, or warehouse locations using SELECT queries on the inventory table.
-          2. Apply stock adjustments when new stock arrives or quantities change: execute a SINGLE UPDATE query that sets stock_quantity, available_quantity, last_restocked, AND status all at once — never split this into two queries. Compute status inline with a CASE expression: 'out_of_stock' when the new available_quantity = 0, 'low_stock' when new available_quantity > 0 and <= reorder_level, 'in_stock' when new available_quantity > reorder_level.
-          3. Identify items needing reorder by finding rows where available_quantity <= reorder_level, and produce reorder recommendations using each item's reorder_quantity as the suggested order size.
-          4. Generate inventory reports and charts on demand — by category, warehouse, supplier, or status — and save report files to /tmp/inventory-reports/.
-          5. Only modify the inventory table. Never insert, update, or delete rows in any other table (orders, shipments, incidents, etc.).
+        You will receive messages with an EVENT_TYPE and a PAYLOAD. React to each event
+        type as follows:
 
-        Data integrity rule: All quantities, product names, and status values in responses,
-        summaries, and chart data must come directly from query results. Never estimate,
-        round, paraphrase, or recall values from memory — always read them from the database first. 
-        When reporting or summarizing stock levels, always use available_quantity
-        (not stock_quantity) as the measure of usable stock.
+        ## EVENT_TYPE: restock_received
+        A supplier has delivered new stock for a SKU.
+        1. Extract item_id, quantity_received, and supplier_name from the PAYLOAD.
+        2. Execute a SINGLE UPDATE query on the inventory table that does all of the
+           following at once — never split this into two queries:
+           - Adds quantity_received to both stock_quantity and available_quantity.
+           - Sets last_restocked = NOW().
+           - Sets status using an inline CASE expression based on the new available_quantity:
+               'out_of_stock' when new available_quantity = 0,
+               'low_stock'    when new available_quantity > 0 AND <= reorder_level,
+               'in_stock'     when new available_quantity > reorder_level.
+           WHERE item_id matches the value from the PAYLOAD.
+        3. Report the updated inventory record after the operation completes.
+
+        ## EVENT_TYPE: inventory_adjustment
+        A manual stock correction or write-off has been received.
+        1. Extract item_id, quantity_delta, adjustment_type, and reason from the PAYLOAD.
+           Note: quantity_delta may be negative (write-off) or positive (correction).
+        2. Execute a SINGLE UPDATE query on the inventory table that does all of the
+           following at once — never split this into two queries:
+           - Adds quantity_delta to both stock_quantity and available_quantity.
+           - Sets status using an inline CASE expression based on the new available_quantity
+             (same CASE logic as restock_received above).
+           - Do NOT update last_restocked for adjustments.
+           WHERE item_id matches the value from the PAYLOAD.
+        3. Report the updated inventory record after the operation completes.
+
+        ## General Responsibilities
+        1. Query inventory levels for individual SKUs, categories, suppliers, or warehouse
+           locations using SELECT queries on the inventory table.
+        2. Identify items needing reorder by finding rows where available_quantity <=
+           reorder_level, and produce reorder recommendations using each item's
+           reorder_quantity as the suggested order size.
+        3. Generate inventory reports and charts on demand — by category, warehouse,
+           supplier, or status — and save report files to /tmp/inventory-reports/.
+        4. Only modify the inventory table. Never insert, update, or delete rows in any
+           other table (orders, shipments, incidents, etc.).
+
+        ## Data Integrity Rules
+        - All quantities, product names, and status values in responses, summaries, and
+          chart data must come directly from query results. Never estimate, round,
+          paraphrase, or recall values from memory — always read them from the database first.
+        - When reporting or summarizing stock levels, always use available_quantity
+          (not stock_quantity) as the measure of usable stock.
+        - If an event type is unrecognized, log it and take no action.
       
       tools: 
         - tool_type: builtin-group
@@ -472,11 +539,10 @@ apps:
         defaultInputModes: [text] 
         defaultOutputModes: [text, file, json] 
         skills: 
-          - description: 'Query stock levels by SKU, category, supplier, or warehouse location '
+          - description: "Query stock levels by SKU, category, supplier, or warehouse location"
             id: check_inventory
             name: Check Inventory
-          - description: Apply stock adjustments and update inventory status after receipt or
-              write-off
+          - description: Apply stock adjustments and update inventory status after receipt or write-off
             id: adjust_stock
             name: Adjust Stock
           - description: Identify items below reorder level, forecast when items will fall below
@@ -485,7 +551,7 @@ apps:
             name: Reorder Recommendations
           - description: Generate inventory reports and charts by category, warehouse, supplier,
               or status
-            id: ' inventory_report '
+            id: inventory_report
             name: Inventory Report
       
       # Discovery & Communication
@@ -525,54 +591,154 @@ apps:
       model: *general_model 
 
       instruction: |
-        You are the Incident Response Agent — the sole creator and manager of all incident records
-        in the system. When you receive conditions from other agents via gateway handlers, you decide
-        whether to create new incidents or update existing ones. All incident records flow through you.
+        You are the Incident Response Agent — the sole creator and manager of all incident
+        records in the system. You decide whether to create new incidents or update existing
+        ones based on event conditions routed to you by the gateway.
 
-        You receive incident-worthy conditions via event handlers (order_decision_handler, logistics_updated_handler,
-        inventory_error_handler, etc.). Each handler provides specific context about what condition occurred.
-        Your job is to: (1) determine if an incident should be created or updated, (2) perform the DB operation,
-        (3) apply escalation logic if needed (e.g., high-severity incidents → 'investigating' status),
-        and (4) report back via the gateway's output handler.
+        You will receive messages with an EVENT_TYPE and a PAYLOAD. React to each event
+        type as follows:
 
-        Your primary responsibilities:
-        1. Create new incidents with appropriate type, severity, status, title, and description.
-           When creating incidents:
-           - First generate a unique incident_id by running this SQL to find the next sequence number:
-             SELECT COALESCE(MAX(CAST(SPLIT_PART(incident_id, '-', 3) AS INTEGER)), 0) + 1 AS next_num
-             FROM incidents WHERE incident_id LIKE 'INC-' || to_char(NOW(), 'YYYY') || '-%'
-           - Then construct the incident_id as 'INC-' || to_char(NOW(), 'YYYY') || '-' || LPAD(next_num::TEXT, 3, '0')
-           - Apply escalation logic: If severity='high', set status to 'investigating'. If severity='medium' or lower, set status to 'open'.
-           - Set created_date to NOW(), and last_updated to NOW().
-           - Execute the INSERT immediately — do not just describe what you would do.
-           - **ESCALATION RULE FOR BLOCKED ORDERS**: When creating inventory_shortage incidents with severity='high',
-             always set status='investigating' in the same INSERT statement — this is required for high-severity inventory issues.
-           - **DEDUPLICATION RULE FOR BLOCKED ORDERS**: When checking if an incident already exists for the same item,
-             only consider incidents with status IN ('open', 'investigating'). Incidents at status='monitoring' are NOT considered open
-             and should NOT prevent creation of a new incident. Use this SQL WHERE clause:
-             `status IN ('open', 'investigating') AND type = 'inventory_shortage'`
-           - **RESPONSE FORMAT REQUIREMENT**: After creating a new incident, you MUST return a JSON response containing
-             the incident details. Format your final response as valid JSON with these fields:
-             {"incident_id": "INC-YYYY-NNN", "type": "incident_type", "severity": "severity_level", 
-              "status": "current_status", "title": "incident title", "description": "incident description",
-              "created_date": "timestamp"}
-        2. Track affected items by creating incident_items records that link incidents to specific
-           inventory items (item_id, product_name, quantity_short).
-        3. Query incidents by status, type, severity, supplier, date range, or affected items.
-        4. Update incident details including severity, status, descriptions, and root cause analysis.
-           After updating an incident, return a JSON response with the updated incident details including
-           incident_id, type, severity, status, and last_updated timestamp.
-        5. Resolve incidents by setting status to 'resolved', resolved_date to NOW(), and documenting
-           the root cause. Return JSON with the resolved incident details.
-        6. Generate incident reports and analytics showing trends, recurring issues, and supplier performance.
-        
-        Database schema:
-        - incidents table columns: incident_id, type, severity, status, title, description, 
-          created_date, last_updated, resolved_date, root_cause, supplier_id
-        - incident_items table columns: id, incident_id, item_id, product_name, quantity_short
-        
-        When querying or updating incidents, always update the last_updated field to NOW() for any modifications.
-        Use JOINs to retrieve incident data along with affected items in a single query when possible.
+        ---
+
+        ## EVENT_TYPE: order_decision
+        An order decision event has been received.
+        1. Read the PAYLOAD carefully. If it does NOT indicate a blocked order due to
+           insufficient stock, take no action.
+        2. If it indicates a blocked order, extract the order_id from the PAYLOAD.
+        3. Query the orders table (joining order_items if needed) to retrieve the affected
+           item details for this order.
+        4. Check the incidents table for any existing incidents matching ALL of the following:
+           - type = 'inventory_shortage'
+           - item_id matches the affected item(s)
+           - status IN ('open', 'investigating')
+           NOTE: Incidents at status='monitoring' are NOT considered open and must NOT
+           prevent creation of a new incident.
+        5. If an open incident already exists, take no action.
+        6. If no open incident exists, create a new incident:
+           - type = 'inventory_shortage', severity = 'high'
+           - Apply escalation logic (see ESCALATION RULES below).
+           - Populate title and description with order and item details.
+           - Also insert corresponding incident_items records linking the incident to
+             the affected items (item_id, product_name, quantity_short).
+        7. Return a JSON response with the incident details (see RESPONSE FORMAT below).
+
+        ---
+
+        ## EVENT_TYPE: logistics_updated
+        A logistics status update event has been received.
+        1. Extract shipment tracking details from the PAYLOAD.
+        2. If the event does NOT indicate a delay (delay_hours = 0 and status does not
+           contain 'delayed'), take no action.
+        3. If a delay is indicated, query the incidents table for any existing open incident
+           with type = 'shipment_delay' for this tracking number
+           (status IN ('open', 'investigating')).
+        4. If an open incident already exists, take no action.
+        5. If no open incident exists, create a new incident:
+           - type = 'shipment_delay', severity = 'medium'
+           - Apply escalation logic (see ESCALATION RULES below).
+           - Populate title and description with the delay details.
+        6. Return a JSON response with the incident details (see RESPONSE FORMAT below).
+
+        ---
+
+        ## EVENT_TYPE: inventory_updated
+        An inventory update event has been received — stock has been restocked.
+        1. Extract item_id and new_stock_quantity from the PAYLOAD.
+        2. Query the incidents table (joining incident_items) to find any open incidents
+           linked to this item_id with status IN ('open', 'investigating').
+        3. If no linked open incidents exist, or if new_stock_quantity is still 0,
+           take no action.
+        4. If the new_stock_quantity is greater than 0 and open incidents exist, update
+           those incidents:
+           - Set status = 'monitoring'
+           - Set last_updated = NOW()
+        5. Return a JSON response with the updated incident details (see RESPONSE FORMAT below).
+
+        ---
+
+        ## EVENT_TYPE: inventory_error
+        An inventory system error has been detected.
+        1. Extract the error details from the PAYLOAD.
+        2. Create a new incident immediately:
+           - type = 'system_error', severity = 'high'
+           - title = 'Inventory System Error'
+           - description = 'Inventory system error: <error details from PAYLOAD>'
+           - Apply escalation logic (see ESCALATION RULES below).
+        3. Return a JSON response with the created incident details (see RESPONSE FORMAT below).
+
+        ---
+
+        ## EVENT_TYPE: order_error
+        An order system error has been detected.
+        1. Extract the error details from the PAYLOAD.
+        2. Create a new incident immediately:
+           - type = 'system_error', severity = 'high'
+           - title = 'Order System Error'
+           - description includes the error details from the PAYLOAD
+           - Apply escalation logic (see ESCALATION RULES below).
+        3. Return a JSON response with the created incident details (see RESPONSE FORMAT below).
+
+        ---
+
+        ## EVENT_TYPE: logistics_error
+        A logistics system error has been detected.
+        1. Extract the error details from the PAYLOAD.
+        2. Create a new incident immediately:
+           - type = 'system_error', severity = 'high'
+           - title = 'Logistics System Error'
+           - description = 'Logistics system error: <error details from PAYLOAD>'
+           - Apply escalation logic (see ESCALATION RULES below).
+        3. Return a JSON response with the created incident details (see RESPONSE FORMAT below).
+
+        ---
+
+        ## INCIDENT ID GENERATION
+        When creating any new incident, generate a unique incident_id as follows:
+        1. Run this SQL to find the next sequence number:
+           SELECT COALESCE(MAX(CAST(SPLIT_PART(incident_id, '-', 3) AS INTEGER)), 0) + 1 AS next_num
+           FROM incidents WHERE incident_id LIKE 'INC-' || to_char(NOW(), 'YYYY') || '-%'
+        2. Construct the incident_id as:
+           'INC-' || to_char(NOW(), 'YYYY') || '-' || LPAD(next_num::TEXT, 3, '0')
+        3. Set created_date = NOW() and last_updated = NOW() on every INSERT.
+        4. Execute the INSERT immediately — do not describe what you would do, just do it.
+
+        ---
+
+        ## ESCALATION RULES
+        - severity = 'high'   → set status = 'investigating'
+        - severity = 'medium' or lower → set status = 'open'
+        Apply this logic in the same INSERT statement — never set status in a separate query.
+
+        ---
+
+        ## RESPONSE FORMAT
+        After every create or update operation, return a JSON response with these fields:
+        {
+          "incident_id": "INC-YYYY-NNN",
+          "type": "incident_type",
+          "severity": "severity_level",
+          "status": "current_status",
+          "title": "incident title",
+          "description": "incident description",
+          "created_date": "timestamp"
+        }
+        For update operations, also include "last_updated" in the response.
+
+        ---
+
+        ## GENERAL RESPONSIBILITIES
+        1. Query incidents by status, type, severity, supplier, date range, or affected items.
+        2. Update incident details including severity, status, descriptions, and root cause. Always set last_updated = NOW() on any modification.
+        3. Resolve incidents by setting status = 'resolved', resolved_date = NOW(), and documenting the root cause.
+        4. Use JOINs to retrieve incident data along with affected items in a single query when possible.
+        5. Generate incident reports and analytics showing trends, recurring issues, and supplier performance.
+        6. If an event type is unrecognized, log it and take no action.
+
+        ---
+
+        ## DATABASE SCHEMA
+        - incidents: incident_id, type, severity, status, title, description, created_date, last_updated, resolved_date, root_cause, supplier_id
+        - incident_items: id, incident_id, item_id, product_name, quantity_short
       
       tools:
         - tool_type: python
@@ -918,7 +1084,6 @@ log:
   log_file_level: DEBUG
   log_file: acme-order-events.log
 
-# To use the `shared_config.yaml` file, uncomment the following line and remove the `shared_config` section below.
 !include ../shared_config.yaml
 
 apps:
@@ -928,26 +1093,22 @@ apps:
       <<: *broker_connection
 
     app_config:
-      namespace: "${NAMESPACE}" 
-      gateway_id: "event-mesh-gw-01" # Unique ID for this gateway instance
+      namespace: "${NAMESPACE}"
+      gateway_id: "event-mesh-gw-01"
 
       artifact_service: *default_artifact_service
       authorization_service:
-        type: "none" # Or "default_rbac"
-      default_user_identity: "anonymous_event_mesh_user" # If no identity from event
-      
+        type: "none"
+      default_user_identity: "anonymous_event_mesh_user"
+
 # --- Event Mesh Gateway Specific Parameters ---
-      event_mesh_broker_config: # For the data plane Solace client
+      event_mesh_broker_config:
         broker_url: ${SOLACE_BROKER_URL}
         broker_username: ${SOLACE_BROKER_USERNAME}
         broker_password: ${SOLACE_BROKER_PASSWORD}
         broker_vpn: ${SOLACE_BROKER_VPN}
 
-      ##############################
-      # 1. UPDATE REQUIRED - START #
-      ##############################
-      
-      event_handlers: # List of handlers for incoming Solace messages
+      event_handlers:
         # ── 1. New order created ──────────────────────────────────────
         - name: "order_created_handler"
           default_user_identity: "anonymous_event_mesh_user"
@@ -955,9 +1116,8 @@ apps:
             - topic: "acme/orders/created"
               qos: 1
           input_expression: >
-            template:A new order event has been received.
-            Process this order: validate inventory availability for all items and update the order status in the database accordingly (status='validated' if stock sufficient, status='blocked' if not). Do not create incident records.
-            Order data: {{text://input.payload}}
+            template:EVENT_TYPE:order_created
+            PAYLOAD:{{text://input.payload}}
           payload_encoding: "utf-8"
           payload_format: "json"
           target_agent_name: "OrderFulfillmentAgent"
@@ -973,12 +1133,8 @@ apps:
             - topic: "acme/inventory/updated"
               qos: 1
           input_expression: >
-            template:An inventory update event has been received.
-            Check all currently blocked orders in the database.
-            For each blocked order, query the inventory table to verify whether the required stock is now available.
-            For any blocked order where stock is sufficient, update its status to 'validated'.
-            If no blocked orders can be fulfilled, report that all blocked orders remain blocked.
-            Inventory event data: {{text://input.payload}}
+            template:EVENT_TYPE:inventory_updated
+            PAYLOAD:{{text://input.payload}}
           payload_encoding: "utf-8"
           payload_format: "json"
           target_agent_name: "OrderFulfillmentAgent"
@@ -987,17 +1143,15 @@ apps:
           forward_context:
             item_id: "input.payload:item_id"
 
-        # ── 3. Shipment delayed — create incident ─────────────────────
+        # ── 3. Shipment delayed ───────────────────────────────────────
         - name: "shipment_delayed_handler"
           default_user_identity: "anonymous_event_mesh_user"
           subscriptions:
             - topic: "acme/logistics/shipment-delayed"
               qos: 1
           input_expression: >
-            template:A shipment delay event has been received.
-            Tracking number {{text://input.payload:tracking_number}} is delayed by {{text://input.payload:delay_hours}} hours via carrier {{text://input.payload:carrier}}.
-            Update the estimated_delivery field on the affected order to the new delivery date from the event. Do not create an incident record — the IncidentResponseAgent will handle that based on the acme/logistics/updated event.
-            Shipment event data: {{text://input.payload}}
+            template:EVENT_TYPE:shipment_delayed
+            PAYLOAD:{{text://input.payload}}
           payload_encoding: "utf-8"
           payload_format: "json"
           target_agent_name: "OrderFulfillmentAgent"
@@ -1005,29 +1159,26 @@ apps:
           on_error: "error_handler"
           forward_context:
             tracking_number: "input.payload:tracking_number"
-        # ── 4. Order cancelled ────────────────────────────────────────                                                                   
-        - name: "order_cancelled_handler"                                                                                                  
-          default_user_identity: "anonymous_event_mesh_user"                                                                               
-          subscriptions:                                                                                                                   
-            - topic: "acme/orders/cancelled"                                                                                               
-              qos: 1                                                                                                                       
-          input_expression: >                                                                                                              
-            template:An order cancellation event has been received.                                                                        
-            Order {{text://input.payload:order_id}} has been cancelled.                                                                    
-            Reason: {{text://input.payload:reason}}.                                                                                       
-            Update the order status to 'cancelled' in the database.                                                                        
-            Cancellation event data: {{text://input.payload}}                                                                              
-          payload_encoding: "utf-8"                                                                                                        
-          payload_format: "json"                                                                                                           
-          target_agent_name: "OrderFulfillmentAgent"                                                                                       
-          on_success: "order_decision_handler"                                                                                             
-          on_error: "error_handler"                                                                                                        
-          forward_context:                                                                                                                 
-            order_id: "input.payload:order_id"  
 
+        # ── 4. Order cancelled ────────────────────────────────────────
+        - name: "order_cancelled_handler"
+          default_user_identity: "anonymous_event_mesh_user"
+          subscriptions:
+            - topic: "acme/orders/cancelled"
+              qos: 1
+          input_expression: >
+            template:EVENT_TYPE:order_cancelled
+            PAYLOAD:{{text://input.payload}}
+          payload_encoding: "utf-8"
+          payload_format: "json"
+          target_agent_name: "OrderFulfillmentAgent"
+          on_success: "order_decision_handler"
+          on_error: "error_handler"
+          forward_context:
+            order_id: "input.payload:order_id"
 
-      output_handlers: # Optional: List of handlers for publishing A2A responses
-       # Publishes validated or blocked decision back to the mesh
+      output_handlers:
+        # Publishes validated or blocked decision back to the mesh
         - name: "order_decision_handler"
           topic_expression: "static:acme/orders/decision"
           payload_expression: "task_response:text"
@@ -1046,17 +1197,7 @@ apps:
           topic_expression: "static:acme/orders/errors"
           payload_expression: "task_response:text"
           payload_encoding: "utf-8"
-          payload_format: "json"
-  # Example of a second output handler, commented out
-  #       - name: "text_response_to_systemB"
-  #         topic_expression: "template:external/systemB/responses/{{text://task_response:id}}"
-  #         payload_expression: "task_response:status.message.parts.0.text" # Direct access
-  #         payload_encoding: "utf-8"
-  #         payload_format: "text"
-
-      ############################
-      # 1. UPDATE REQUIRED - END #
-      ############################'''
+          payload_format: "json"'''
     if create_file(str(gateways_dir / 'acme-order-events.yaml'), content_acme_order_events, 'acme-order-events.yaml'):
         created += 1
 
@@ -1103,22 +1244,8 @@ apps:
             - topic: "acme/suppliers/restock-received"
               qos: 1
           input_expression: >
-            template:Supplier restock received for SKU {{text://input.payload:item_id}} (+{{text://input.payload:quantity_received}} units from {{text://input.payload:supplier_name}}).
-
-            Execute this UPDATE statement exactly as written (do not modify, do not split into separate queries):
-            UPDATE inventory
-            SET stock_quantity = stock_quantity + {{text://input.payload:quantity_received}},
-                available_quantity = available_quantity + {{text://input.payload:quantity_received}},
-                last_restocked = NOW(),
-                status = CASE
-                  WHEN (available_quantity + {{text://input.payload:quantity_received}}) = 0 THEN 'out_of_stock'
-                  WHEN (available_quantity + {{text://input.payload:quantity_received}}) > 0 AND (available_quantity + {{text://input.payload:quantity_received}}) <= reorder_level THEN 'low_stock'
-                  ELSE 'in_stock'
-                END
-            WHERE item_id = '{{text://input.payload:item_id}}'
-
-            This must be a single UPDATE with the status computed inline. Do not execute this as two separate queries.
-            Full event data: {{text://input.payload}}
+            template:EVENT_TYPE:restock_received
+            PAYLOAD:{{text://input.payload}}
           payload_encoding: "utf-8"
           payload_format: "json"
           target_agent_name: "InventoryManagementAgent"
@@ -1134,21 +1261,8 @@ apps:
             - topic: "acme/inventory/adjustment"
               qos: 1
           input_expression: >
-            template:Inventory adjustment received for SKU {{text://input.payload:item_id}} (delta: {{text://input.payload:quantity_delta}} units, type: {{text://input.payload:adjustment_type}}, reason: {{text://input.payload:reason}}).
-
-            Execute this UPDATE statement exactly as written (do not modify, do not split into separate queries):
-            UPDATE inventory
-            SET stock_quantity = stock_quantity + {{text://input.payload:quantity_delta}},
-                available_quantity = available_quantity + {{text://input.payload:quantity_delta}},
-                status = CASE
-                  WHEN (available_quantity + {{text://input.payload:quantity_delta}}) = 0 THEN 'out_of_stock'
-                  WHEN (available_quantity + {{text://input.payload:quantity_delta}}) > 0 AND (available_quantity + {{text://input.payload:quantity_delta}}) <= reorder_level THEN 'low_stock'
-                  ELSE 'in_stock'
-                END
-            WHERE item_id = '{{text://input.payload:item_id}}'
-
-            Do not update last_restocked. This must be a single UPDATE with status computed inline. Do not execute as two separate queries.
-            Full event data: {{text://input.payload}}
+            template:EVENT_TYPE:inventory_adjustment
+            PAYLOAD:{{text://input.payload}}
           payload_encoding: "utf-8"
           payload_format: "json"
           target_agent_name: "InventoryManagementAgent"
@@ -1216,19 +1330,8 @@ apps:
             - topic: "acme/orders/decision"
               qos: 1
           input_expression: >
-            template:An order decision event has been received.
-            Read the decision text carefully.
-            If the text indicates that an order was blocked due to insufficient stock, extract the order_id mentioned in the text.
-            Query the orders table to get the item details for this order (join with order_items if needed).
-            Then check the incidents table for any existing incidents with type='inventory_shortage' for the same item_id(s) AND status IN ('open', 'investigating').
-            Once an incident reaches 'monitoring' status, it is no longer considered "open" and a new incident should be created for new blocked orders.
-            If no existing open incident is found, create a new incident with type='inventory_shortage', severity='high',
-            and populate title and description with the order and item details.
-            Also create corresponding incident_items records linking the incident to the affected items.
-            Apply your escalation logic to determine the appropriate status based on severity.
-            Return a JSON response with the incident details.
-            If the decision does not indicate a blocked order, or if an open incident already exists (status='open' or 'investigating'), take no action.
-            Decision data: {{text://input.payload}}
+            template:EVENT_TYPE:order_decision
+            PAYLOAD:{{text://input.payload}}
           payload_encoding: "utf-8"
           payload_format: "json"
           target_agent_name: "IncidentResponseAgent"
@@ -1237,21 +1340,15 @@ apps:
           forward_context:
             decision: "input.payload"
 
-        # ── 2. Logistics updated — create shipment delay incidents ──────
+        # ── 2. Logistics updated — create shipment delay incidents ────
         - name: "logistics_updated_handler"
           default_user_identity: "anonymous_event_mesh_user"
           subscriptions:
             - topic: "acme/logistics/updated"
               qos: 1
           input_expression: >
-            template:A logistics status update event has been received.
-            Extract the shipment tracking details from the event.
-            If the event indicates a shipment delay (delay_hours > 0 or status contains 'delayed'), query the incidents table to check for any existing open 'shipment_delay' incidents for this tracking number.
-            If no existing incident is found, create a new incident with type='shipment_delay', severity='medium', and populate title and description with the delay details.
-            Apply your escalation logic to determine the appropriate status based on severity.
-            Return a JSON response with the incident details.
-            If the event does not indicate a delay, or if an open incident already exists, take no action.
-            Logistics event data: {{text://input.payload}}
+            template:EVENT_TYPE:logistics_updated
+            PAYLOAD:{{text://input.payload}}
           payload_encoding: "utf-8"
           payload_format: "json"
           target_agent_name: "IncidentResponseAgent"
@@ -1260,22 +1357,15 @@ apps:
           forward_context:
             tracking_number: "input.payload:tracking_number"
 
-        # ── 4. Inventory updated — update linked incidents ────────────
+        # ── 3. Inventory updated — update linked incidents ────────────
         - name: "inventory_updated_handler"
           default_user_identity: "anonymous_event_mesh_user"
           subscriptions:
             - topic: "acme/inventory/updated"
               qos: 1
           input_expression: >
-            template:An inventory update event has been received.
-            The item {{text://input.payload:item_id}} has been restocked with new stock quantity {{text://input.payload:new_stock_quantity}}.
-            Query the incidents table to find any open incidents (status='open' or status='investigating') that are linked 
-            to this item_id via the incident_items table.
-            If the new stock quantity is now sufficient (greater than 0), update those linked incidents to status='monitoring' 
-            and set last_updated to NOW().
-            Return a JSON response with the updated incident details.
-            If no linked open incidents exist, or if stock is still insufficient, take no action.
-            Inventory event data: {{text://input.payload}}
+            template:EVENT_TYPE:inventory_updated
+            PAYLOAD:{{text://input.payload}}
           payload_encoding: "utf-8"
           payload_format: "json"
           target_agent_name: "IncidentResponseAgent"
@@ -1284,23 +1374,15 @@ apps:
           forward_context:
             item_id: "input.payload:item_id"
 
-        # ── 5. Inventory errors — create system error incident ────────
+        # ── 4. Inventory errors — create system error incident ────────
         - name: "inventory_error_handler"
           default_user_identity: "anonymous_event_mesh_user"
           subscriptions:
             - topic: "acme/inventory/errors"
               qos: 1
           input_expression: >
-            template:An inventory system error has been detected.
-            You must immediately call the incidents_db tool and run this SQL INSERT exactly as written — do not modify the field values, do not describe it, just execute it:
-            INSERT INTO incidents (incident_id, type, severity, status, title, description, created_date, last_updated)
-            SELECT 'INC-' || to_char(NOW(), 'YYYY') || '-' || LPAD((COALESCE(MAX(CAST(SPLIT_PART(incident_id, '-', 3) AS INTEGER)), 0) + 1)::TEXT, 3, '0'),
-            'system_error', 'high', 'investigating', 'Inventory System Error',
-            'Inventory system error: {{text://input.payload:error}}',
-            NOW(), NOW()
-            FROM incidents WHERE incident_id LIKE 'INC-' || to_char(NOW(), 'YYYY') || '-%';
-            After running the INSERT, return a JSON response with the created incident details (incident_id, type, severity, status, title, description, created_date).
-            Error data: {{text://input.payload}}
+            template:EVENT_TYPE:inventory_error
+            PAYLOAD:{{text://input.payload}}
           payload_encoding: "utf-8"
           payload_format: "json"
           target_agent_name: "IncidentResponseAgent"
@@ -1309,20 +1391,15 @@ apps:
           forward_context:
             error_source: "inventory"
 
-        # ── 6. Order errors — create system error incident ────────────
+        # ── 5. Order errors — create system error incident ────────────
         - name: "order_error_handler"
           default_user_identity: "anonymous_event_mesh_user"
           subscriptions:
             - topic: "acme/orders/errors"
               qos: 1
           input_expression: >
-            template:An order system error has been detected.
-            Create a new incident with type='system_error', severity='high',
-            and set created_date and last_updated to NOW().
-            Apply your escalation logic to determine the appropriate status based on severity.
-            Populate the title with "Order System Error" and include the error details in the description.
-            Return a JSON response with the created incident details.
-            Error data: {{text://input.payload}}
+            template:EVENT_TYPE:order_error
+            PAYLOAD:{{text://input.payload}}
           payload_encoding: "utf-8"
           payload_format: "json"
           target_agent_name: "IncidentResponseAgent"
@@ -1331,23 +1408,15 @@ apps:
           forward_context:
             error_source: "orders"
 
-        # ── 7. Logistics errors — create system error incident ────────
+        # ── 6. Logistics errors — create system error incident ────────
         - name: "logistics_error_handler"
           default_user_identity: "anonymous_event_mesh_user"
           subscriptions:
             - topic: "acme/logistics/errors"
               qos: 1
           input_expression: >
-            template:A logistics system error has been detected.
-            You must immediately call the incidents_db tool and run this SQL INSERT exactly as written — do not modify the field values, do not describe it, just execute it:
-            INSERT INTO incidents (incident_id, type, severity, status, title, description, created_date, last_updated)
-            SELECT 'INC-' || to_char(NOW(), 'YYYY') || '-' || LPAD((COALESCE(MAX(CAST(SPLIT_PART(incident_id, '-', 3) AS INTEGER)), 0) + 1)::TEXT, 3, '0'),
-            'system_error', 'high', 'investigating', 'Logistics System Error',
-            'Logistics system error: {{text://input.payload:error}}',
-            NOW(), NOW()
-            FROM incidents WHERE incident_id LIKE 'INC-' || to_char(NOW(), 'YYYY') || '-%';
-            After running the INSERT, return a JSON response with the created incident details (incident_id, type, severity, status, title, description, created_date).
-            Error data: {{text://input.payload}}
+            template:EVENT_TYPE:logistics_error
+            PAYLOAD:{{text://input.payload}}
           payload_encoding: "utf-8"
           payload_format: "json"
           target_agent_name: "IncidentResponseAgent"
@@ -1357,14 +1426,14 @@ apps:
             error_source: "logistics"
 
       output_handlers:
-        # Publishes incident creation events (triggered when new incidents are created)
+        # Publishes incident creation events
         - name: "incident_created_handler"
           topic_expression: "static:acme/incidents/created"
           payload_expression: "task_response:text"
           payload_encoding: "utf-8"
           payload_format: "json"
 
-        # Publishes incident response confirmations (for updates and final confirmations)
+        # Publishes incident response confirmations (for updates)
         - name: "incident_response_handler"
           topic_expression: "static:acme/incidents/response"
           payload_expression: "task_response:text"
@@ -1399,8 +1468,8 @@ apps:
       artifact_service: *default_artifact_service
       authorization_service:
         type: "none"
-        default_user_identity: "anonymous_event_mesh_user"
-      
+      default_user_identity: "anonymous_event_mesh_user"
+
       event_mesh_broker_config:
         broker_url: ${SOLACE_BROKER_URL}
         broker_username: ${SOLACE_BROKER_USERNAME}
@@ -1408,16 +1477,16 @@ apps:
         broker_vpn: ${SOLACE_BROKER_VPN}
 
       event_handlers:
-        
+
+        # ── 1. New shipment created ───────────────────────────────────
         - name: "shipment_created_handler"
           default_user_identity: "anonymous_event_mesh_user"
           subscriptions:
             - topic: "acme/logistics/shipment-created"
               qos: 1
           input_expression: >
-            template:A new shipment has been created.
-            Create a shipment record in the database.
-            Shipment data: {{text://input.payload}}
+            template:EVENT_TYPE:shipment_created
+            PAYLOAD:{{text://input.payload}}
           payload_encoding: "utf-8"
           payload_format: "json"
           target_agent_name: "LogisticsAgent"
@@ -1426,16 +1495,16 @@ apps:
           forward_context:
             shipment_id: "input.payload:shipment_id"
             order_id: "input.payload:order_id"
-        
+
+        # ── 2. Shipment status changed ────────────────────────────────
         - name: "status_changed_handler"
           default_user_identity: "anonymous_event_mesh_user"
           subscriptions:
             - topic: "acme/logistics/status-changed"
               qos: 1
           input_expression: >
-            template:A shipment status update event has been received.
-            Update the shipment record with the new status.
-            Event data: {{text://input.payload}}
+            template:EVENT_TYPE:status_changed
+            PAYLOAD:{{text://input.payload}}
           payload_encoding: "utf-8"
           payload_format: "json"
           target_agent_name: "LogisticsAgent"
@@ -1444,16 +1513,16 @@ apps:
           forward_context:
             shipment_id: "input.payload:shipment_id"
             tracking_number: "input.payload:tracking_number"
-        
+
+        # ── 3. Shipment delayed ───────────────────────────────────────
         - name: "shipment_delayed_handler"
           default_user_identity: "anonymous_event_mesh_user"
           subscriptions:
             - topic: "acme/logistics/shipment-delayed"
               qos: 1
           input_expression: >
-            template:A shipment delay event has been detected.
-            Log the delay and recalculate estimated delivery.
-            Event data: {{text://input.payload}}
+            template:EVENT_TYPE:shipment_delayed
+            PAYLOAD:{{text://input.payload}}
           payload_encoding: "utf-8"
           payload_format: "json"
           target_agent_name: "LogisticsAgent"
@@ -1464,17 +1533,20 @@ apps:
             order_id: "input.payload:order_id"
 
       output_handlers:
-        
+
+        # Publishes shipment update confirmations
         - name: "shipment_updated_handler"
           topic_expression: "static:acme/logistics/updated"
           payload_format: "json"
           payload_expression: "task_response:text"
-        
+
+        # Publishes delay event confirmations
         - name: "shipment_delayed_event_handler"
           topic_expression: "static:acme/logistics/updated"
           payload_format: "json"
           payload_expression: "task_response:text"
-        
+
+        # Error handler — publishes failures for observability
         - name: "error_handler"
           topic_expression: "static:acme/logistics/errors"
           payload_format: "json"

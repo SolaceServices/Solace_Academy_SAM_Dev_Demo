@@ -77,7 +77,7 @@ agent_file = sys.argv[1]
 with open(agent_file, 'r') as f:
     content = f.read()
 
-# 1. Insert email instructions before "Database schema:"
+# 1. Insert email instructions before "## DATABASE SCHEMA"
 if 'send_alert_email' not in content:
     email_instructions = """        When creating high-severity incidents (severity='high'):
         1. Create the incident record using the incidents_db tool
@@ -95,7 +95,7 @@ if 'send_alert_email' not in content:
         Description: <full description>
 
 """
-    content = content.replace('        Database schema:', email_instructions + '        Database schema:', 1)
+    content = content.replace('        ## DATABASE SCHEMA', email_instructions + '        ## DATABASE SCHEMA', 1)
 
 # 2. Insert email tool after list_artifacts tool entry
 if 'email_tool' not in content:

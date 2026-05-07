@@ -1049,25 +1049,72 @@ Without this, OpenCode answers from training data (potentially stale).
 Run this prompt:
 
 ```
-use context7 for solace-agent-mesh
+use context7 for solace-agent-mesh.
 
-Read configs/agents/order_fulfillment_agent_agent.yaml to understand the project
-patterns, then create a new agent config for an IncidentResponseAgent that uses
-SqlDatabaseTool to connect to postgresql://acme:acme@localhost:5432/orders and
-handles creating, querying, updating and resolving incidents in the incidents and
-incident_items tables.
+Read configs/agents/order_fulfillment.yaml; follow its conventions for all
+boilerplate (broker, log, session_service, artifact_service, artifact_handling,
+data_tools_config, auto_summarization, agent_card_publishing, agent_discovery,
+inter_agent_communication, !include shared_config.yaml).
 
-The incidents table has columns: incident_id, type, severity, status, title,
-description, created_date, last_updated, resolved_date, root_cause, supplier_id.
-The incident_items table has: id, incident_id, item_id, product_name, quantity_short.
+Create configs/agents/incident_response.yaml:
+agent_name "IncidentResponse", app "IncidentResponse__app",
+display_name "Incident Response Agent", supports_streaming true.
 
-The agent must include escalation logic: severity='high' should set status='investigating'.
-The agent must generate incident_id values using this SQL pattern:
-SELECT COALESCE(MAX(CAST(SPLIT_PART(incident_id, '-', 3) AS INTEGER)), 0) + 1 AS next_num
-FROM incidents WHERE incident_id LIKE 'INC-' || to_char(NOW(), 'YYYY') || '-%'
+TOOLS (ordered): (1) SqlDatabaseTool tool_name "incidents_db",
+connection_string "postgresql://acme:acme@localhost:5432/orders" — handles
+INSERT/UPDATE on incidents/incident_items and SELECT on orders/order_items.
+(2) builtin create_chart_from_plotly_config. (3) builtin load_artifact.
+(4) builtin list_artifacts.
 
-After creating an incident, the agent MUST return a JSON response with these fields:
-incident_id, type, severity, status, title, description, created_date
+session_service db_url "${INCIDENT_RESPONSE_AGENT_DATABASE_URL,sqlite:///incident_response.db}".
+
+agent_card skills: create_incident, query_incidents, update_incident,
+resolve_incident, track_affected_items, generate_incident_reports.
+
+INSTRUCTIONS:
+Sole creator/manager of incidents. Input: EVENT_TYPE + PAYLOAD from gateway.
+Always return ONE JSON object — no prose, no markdown fences.
+Use INSERT/UPDATE with RETURNING; never wrap INSERT in a CTE.
+Never format timestamps in SQL — return raw Postgres values.
+
+Schema:
+incidents(incident_id, type, severity, status, title, description,
+created_date, last_updated, resolved_date, root_cause, supplier_id)
+incident_items(id, incident_id, item_id, product_name, quantity_short)
+
+incident_id pattern (canonical — do not deviate):
+VALUES ('INC-'||to_char(NOW(),'YYYY')||'-'||LPAD(((SELECT
+COALESCE(MAX(SPLIT_PART(incident_id,'-',3)::int),0) FROM incidents
+WHERE incident_id LIKE 'INC-'||to_char(NOW(),'YYYY')||'-%')+1)::text,3,'0'), ...)
+RETURNING incident_id, type, severity, status, title, description,
+created_date, last_updated;
+
+Severity is HARDCODED per event — never recompute from payload values.
+Status on INSERT: high→investigating, else→open.
+"Open" = status IN ('open','investigating'); 'monitoring' is NOT open.
+
+EVENT_TYPES:
+- order_decision: if no stock-blocked order → no_action. Else extract order_id,
+  JOIN orders+order_items, dedup via incident_items. If clear, create
+  type='inventory_shortage', severity='high'; one incident_items row per item
+  (quantity_short = ordered qty).
+- logistics_updated: if delay_hours=0 AND status≠'delayed' → no_action. Else
+  dedup open shipment_delay incidents by tracking_number in description. If
+  clear, create type='shipment_delay', severity='medium'. Description MUST
+  include tracking_number.
+- inventory_updated: extract item_id, new_stock_quantity. If qty=0 → no_action.
+  Find open incidents linked to item_id via incident_items; if none → no_action.
+  Else UPDATE status='monitoring', last_updated=NOW().
+- inventory_error: create type='system_error', severity='high',
+  title='Inventory System Error', description='Inventory system error: '||full payload as JSON.
+- order_error: same; title='Order System Error', prefix='Order system error: '.
+- logistics_error: same; title='Logistics System Error', prefix='Logistics system error: '.
+
+Response shapes:
+created:   {"action":"created","incident_id","type","severity","status","title","description","created_date"}
+updated:   {"action":"updated","incident_id","status","last_updated"}
+no_action: {"action":"no_action","event_type","reason"}
+error:     {"action":"error","event_type","error"}
 ```
 
 OpenCode will generate `configs/agents/incident_response_agent_agent.yaml`.
@@ -1078,22 +1125,44 @@ OpenCode will generate `configs/agents/incident_response_agent_agent.yaml`.
 use context7 for solace-agent-mesh
 
 Read configs/gateways/acme-order-events.yaml then create
-configs/gateways/acme-incidents-events.yaml routing these
-topics to IncidentResponseAgent:
+configs/gateways/acme-incidents-events.yaml that subscribes to
+the following INPUT topics and routes them to the IncidentResponse agent:
 
-- acme/orders/decision → if order blocked, create inventory_shortage incident (severity=high)
-- acme/logistics/updated → if shipment delayed, create shipment_delay incident (severity=medium)
-- acme/inventory/updated → if stock sufficient, update linked incidents to status='monitoring'
-- acme/inventory/errors → create system_error incident (severity=high)
-- acme/orders/errors → create system_error incident (severity=high)
-- acme/logistics/errors → create system_error incident (severity=high)
+INPUT TOPICS (subscribe + create event_handlers for each):
+- acme/orders/decision    → forward_context decision: "input.payload"             (the WHOLE payload, not a field within it); on_success: incident_created_handler
+- acme/logistics/updated  → forward_context tracking_number: "input.payload:tracking_number";   on_success: incident_created_handler
+- acme/inventory/updated  → forward_context item_id: "input.payload:item_id";                   on_success: incident_response_handler
+- acme/inventory/errors   → forward_context error_source: "inventory" (a static string);        on_success: incident_created_handler
+- acme/orders/errors      → forward_context error_source: "orders"   (a static string);         on_success: incident_created_handler
+- acme/logistics/errors   → forward_context error_source: "logistics" (a static string);        on_success: incident_created_handler
 
-Requirements:
-- default_user_identity goes inside each handler block, not app level
-- Use static output topics: static:acme/incidents/created (for new), static:acme/incidents/response (for updates)
-- Error topic: static:acme/incidents/errors
-- gateway_id must be unique: use "incident-gw-01"
-- All handlers must end with "Return a JSON response with the incident details"
+DO NOT subscribe to acme/incidents/created — that is an OUTPUT topic
+this gateway publishes TO, not an input it consumes.
+
+OUTPUT TOPICS (create three output_handlers):
+- incident_created_handler   → static:acme/incidents/created   (for new incidents)
+- incident_response_handler  → static:acme/incidents/response  (for updates to existing incidents)
+- error_handler              → static:acme/incidents/errors    (for handler failures, used as on_error)
+
+INPUT EXPRESSION FORMAT:
+Each event_handler's input_expression must be a thin pass-through using this exact pattern — do NOT embed business logic, SQL, or branching instructions in the prompt. The agent handles all logic. Use:
+
+  input_expression: >
+    template:EVENT_TYPE:<event_type>
+    PAYLOAD:{{text://input.payload}}
+
+Where <event_type> is one of: order_decision, logistics_updated, inventory_updated, inventory_error, order_error, logistics_error.
+
+REQUIREMENTS:
+- target_agent_name must be exactly "IncidentResponse" (this is the agent_name
+  registered by the agent, NOT its display name "Incident Response Agent")
+- default_user_identity: "anonymous_event_mesh_user" — set at BOTH app_config level AND inside each event_handler block
+- Every event_handler uses on_error: "error_handler"
+- payload_encoding: "utf-8" and payload_format: "json" for all handlers
+- All subscriptions use qos: 1
+- gateway_id: "incident-gw-01"
+- Use static output topics only (static:acme/incidents/...)
+- Preserve the broker, log, artifact_service, authorization_service, and !include shared_config.yaml structure from acme-order-events.yaml
 ```
 
 OpenCode will generate `configs/gateways/acme-incidents-events.yaml`.

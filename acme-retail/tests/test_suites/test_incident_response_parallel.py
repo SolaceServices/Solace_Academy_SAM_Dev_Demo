@@ -6,10 +6,6 @@ Runs all 5 tests concurrently with a live progress table and clean output.
 Each test owns a unique identifier embedded in its event payload, and
 asserts on rows in the database that contain that identifier. This avoids
 all forms of cross-test interference under parallel execution.
-
-Diagnostic mode: when a test's broker check or DB check fails, the captured
-broker message (if any) is dumped to stderr so you can see exactly what
-the agent returned. Look for a `[diag tN]` prefix in the test output.
 """
 
 import sys
@@ -92,53 +88,6 @@ def _poll_for_row(query, params, deadline_s=DB_POLL_DEADLINE_S):
     return None
 
 
-# ── Diagnostic helpers ─────────────────────────────────────────────────────
-def _diag(test_num, label, payload):
-    """Emit a diagnostic dump on test failure. Goes to stderr so it's
-    visible even when the pretty UI is rendering on stdout."""
-    sep = "─" * 60
-    print(f"\n[diag t{test_num}] {label}", file=sys.stderr)
-    print(f"[diag t{test_num}] {sep}", file=sys.stderr)
-    if payload is None:
-        print(f"[diag t{test_num}] (no broker message captured)", file=sys.stderr)
-    else:
-        try:
-            pretty = json.dumps(payload, indent=2, default=str)
-        except (TypeError, ValueError):
-            pretty = repr(payload)
-        for line in pretty.splitlines():
-            print(f"[diag t{test_num}] {line}", file=sys.stderr)
-    print(f"[diag t{test_num}] {sep}\n", file=sys.stderr)
-
-
-def _diag_db_snapshot(test_num, query, params, label):
-    """Dump matching rows from the DB so we can see what (if anything)
-    the agent persisted. Useful when a DB lookup misses."""
-    sep = "─" * 60
-    print(f"\n[diag t{test_num}] DB snapshot: {label}", file=sys.stderr)
-    print(f"[diag t{test_num}] {sep}", file=sys.stderr)
-    try:
-        conn = psycopg2.connect(DB_DSN)
-        try:
-            cur = conn.cursor()
-            cur.execute(query, params)
-            rows = cur.fetchall()
-            cols = [d[0] for d in cur.description] if cur.description else []
-        finally:
-            conn.close()
-        if not rows:
-            print(f"[diag t{test_num}] (no rows match)", file=sys.stderr)
-        else:
-            print(f"[diag t{test_num}] columns: {cols}", file=sys.stderr)
-            for r in rows[:10]:
-                print(f"[diag t{test_num}] {r}", file=sys.stderr)
-            if len(rows) > 10:
-                print(f"[diag t{test_num}] ... ({len(rows) - 10} more)", file=sys.stderr)
-    except Exception as exc:
-        print(f"[diag t{test_num}] DB snapshot failed: {exc}", file=sys.stderr)
-    print(f"[diag t{test_num}] {sep}\n", file=sys.stderr)
-
-
 # ── Predicate helpers ──────────────────────────────────────────────────────
 def _parse_msg(msg):
     """Return msg as a dict if possible, else None."""
@@ -218,13 +167,10 @@ def test_1_blocked_order_creates_incident(results: ResultCollector, lock: thread
         progress.update_status(test_num, "❌", time.monotonic() - start)
         with lock:
             results.record("t1_response_received", False, str(exc))
-        _diag(test_num, "scenario raised exception (no broker message)", None)
         return
 
     with lock:
         with results.test("t1_response_received", label="Message received on broker"):
-            if msg is None:
-                _diag(test_num, "broker check failed: no message captured", msg)
             assert msg is not None
 
     time.sleep(POST_MSG_SLEEP_S)
@@ -235,14 +181,6 @@ def test_1_blocked_order_creates_incident(results: ResultCollector, lock: thread
                 "SELECT id FROM incident_items WHERE item_id = %s LIMIT 1",
                 (sku_to_check,),
             )
-            if row is None:
-                _diag(test_num, "DB check failed — broker message was:", msg)
-                _diag_db_snapshot(
-                    test_num,
-                    "SELECT id, incident_id, item_id FROM incident_items WHERE item_id = %s",
-                    (sku_to_check,),
-                    f"incident_items where item_id={sku_to_check}",
-                )
             assert row is not None, (
                 f"No incident_items entry was created for {sku_to_check} "
                 f"within {DB_POLL_DEADLINE_S}s of the broker reply."
@@ -300,15 +238,6 @@ def test_2_validated_order_no_incident(results: ResultCollector, lock: threading
                 row = cur.fetchone()
             finally:
                 conn.close()
-            if row is not None:
-                _diag(test_num, "unexpected incident found — broker message was:", msg)
-                _diag_db_snapshot(
-                    test_num,
-                    "SELECT incident_id, type, severity, status, description "
-                    "FROM incidents WHERE description LIKE %s",
-                    (f"%{TEST2_ORDER_ID}%",),
-                    f"any incident referencing {TEST2_ORDER_ID}",
-                )
             assert row is None, (
                 f"Unexpected inventory_shortage incident was created for "
                 f"validated order {TEST2_ORDER_ID}: {row}"
@@ -347,13 +276,10 @@ def test_3_inventory_restock_updates_incident(results: ResultCollector, lock: th
         progress.update_status(test_num, "❌", time.monotonic() - start)
         with lock:
             results.record("t3_response_received", False, str(exc))
-        _diag(test_num, "scenario raised exception (no broker message)", None)
         return
 
     with lock:
         with results.test("t3_response_received", label="Message received on broker"):
-            if msg is None:
-                _diag(test_num, "broker check failed: no message captured", msg)
             assert msg is not None
 
     time.sleep(POST_MSG_SLEEP_S)
@@ -364,14 +290,6 @@ def test_3_inventory_restock_updates_incident(results: ResultCollector, lock: th
                 "SELECT status FROM incidents WHERE incident_id = %s",
                 (HIGH_SEV_INCIDENT_ID,),
             )
-            if row is None or row[0] != "monitoring":
-                _diag(test_num, "DB check failed — broker message was:", msg)
-                _diag_db_snapshot(
-                    test_num,
-                    "SELECT incident_id, status, last_updated FROM incidents WHERE incident_id = %s",
-                    (HIGH_SEV_INCIDENT_ID,),
-                    f"incident {HIGH_SEV_INCIDENT_ID}",
-                )
             assert row is not None, f"Incident {HIGH_SEV_INCIDENT_ID} not found"
             assert row[0] == "monitoring", (
                 f"Incident {HIGH_SEV_INCIDENT_ID} has status='{row[0]}', "
@@ -414,18 +332,10 @@ def test_4_inventory_error_creates_incident(results: ResultCollector, lock: thre
         progress.update_status(test_num, "❌", time.monotonic() - start)
         with lock:
             results.record("t4_response_received", False, str(exc))
-        _diag(test_num, "scenario raised exception (no broker message)", None)
         return
 
     with lock:
         with results.test("t4_response_received", label="Message received on broker"):
-            if msg is None:
-                _diag(
-                    test_num,
-                    "broker check failed: no message matched predicate "
-                    "(expected action='created' with marker or system_error type)",
-                    msg,
-                )
             assert msg is not None
 
     time.sleep(POST_MSG_SLEEP_S)
@@ -439,16 +349,6 @@ def test_4_inventory_error_creates_incident(results: ResultCollector, lock: thre
                 "ORDER BY created_date DESC LIMIT 1",
                 (f"%{TEST4_ERROR_MARKER}%",),
             )
-            if row is None:
-                _diag(test_num, "DB check failed — broker message was:", msg)
-                _diag_db_snapshot(
-                    test_num,
-                    "SELECT incident_id, type, severity, description, created_date "
-                    "FROM incidents WHERE type = 'system_error' "
-                    "ORDER BY created_date DESC LIMIT 5",
-                    (),
-                    "5 most recent system_error incidents (regardless of marker)",
-                )
             assert row is not None, (
                 f"No system_error incident found containing marker "
                 f"'{TEST4_ERROR_MARKER}' within {DB_POLL_DEADLINE_S}s."
@@ -494,13 +394,10 @@ def test_5_shipment_delay_creates_incident(results: ResultCollector, lock: threa
         progress.update_status(test_num, "❌", time.monotonic() - start)
         with lock:
             results.record("t5_response_received", False, str(exc))
-        _diag(test_num, "scenario raised exception (no broker message)", None)
         return
 
     with lock:
         with results.test("t5_response_received", label="Message received on broker"):
-            if msg is None:
-                _diag(test_num, "broker check failed: no message captured", msg)
             assert msg is not None
 
     time.sleep(POST_MSG_SLEEP_S)
@@ -514,16 +411,6 @@ def test_5_shipment_delay_creates_incident(results: ResultCollector, lock: threa
                 "ORDER BY created_date DESC LIMIT 1",
                 (f"%{TEST5_TRACKING_NUMBER}%",),
             )
-            if row is None or row[1] != "medium":
-                _diag(test_num, "DB/severity check failed — broker message was:", msg)
-                _diag_db_snapshot(
-                    test_num,
-                    "SELECT incident_id, type, severity, description, created_date "
-                    "FROM incidents WHERE type = 'shipment_delay' "
-                    "ORDER BY created_date DESC LIMIT 5",
-                    (),
-                    "5 most recent shipment_delay incidents (regardless of tracking_number)",
-                )
             assert row is not None, (
                 f"No shipment_delay incident found containing tracking "
                 f"number '{TEST5_TRACKING_NUMBER}' within {DB_POLL_DEADLINE_S}s."
@@ -589,9 +476,6 @@ def print_organized_summary(results: ResultCollector):
         print(_bold_red(thick))
         print(_bold_red(f"  ✗   FAILED  —  {results.passed}/{results.total} checks passed ({results.failed} failed)"))
         print(_bold_red(thick))
-        print()
-        print(_dim("  Look for [diag tN] sections above (or in stderr) for"))
-        print(_dim("  the broker message and DB snapshot at the time of failure."))
 
 
 # ── Main Runner ────────────────────────────────────────────────────────────

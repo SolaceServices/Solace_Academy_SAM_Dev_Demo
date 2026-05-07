@@ -8,7 +8,6 @@ By the end of this course, you'll understand:
 - What the orchestrator does and why it's essential
 - The five orchestration patterns (sequential, parallel, conditional, event-driven, human-in-the-loop)
 - How to use projects, prompts, and artifacts effectively
-- How workflows are structured and executed
 
 ## Prerequisites
 
@@ -26,11 +25,6 @@ At the bottom of your code editor, click the `Run Course Setup` button, then sel
 - install the dependencies
 - initalize sam using the configurations we added to the `.env.config` file previously.
 
-Alternatively, you can run these commands:
-```bash
-cd /workspaces/Solace_Academy_SAM_Dev_Demo/200-Orchestration
-bash ../acme-retail/scripts/200-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/200-Orchestration
-```
 
 Once it's running, access the Web UI by naigating to the "Ports" tab and click the web icon next to port `8000`
 
@@ -310,17 +304,18 @@ Let's create a project for this certification series:
 
 1. Click the **Projects** icon
 2. Click **"New Project"**
-3. Name it: `SAM_dev_demo`
-4. Add project-specific instructions:
+3. Name it: `Solace Academt SAM Demo`
+4. Give it a description: `Acme Retail SAM Development`
+5. Add project-specific instructions:
 
 ```markdown
 # Project-Specific Instructions
 
 Keep your responses concise and to-the-point. Focus on delivering actionable insights rather than explanations.
 
-Use bullet points and formatted tables when presenting data. Include visual elements only when they enhance understanding.
+Use bullet points and formatted tables when presenting data. Include visual elements when they enhance understanding.
 
-Format all outputs with executive summaries (1 page max) and ensure proper handling of sensitive information.
+Format all outputs with executive summaries (1 page max).
 
 Remember that your outputs will inform critical decisions - accuracy and clarity are paramount.
 ```
@@ -346,6 +341,9 @@ Let's create a prompt that lists all available agents and tools:
 1. Click the **Prompts** menu
 2. Click **"New Prompt"**
 3. Name it: `List Agents and Tools`
+4. Give it a description: `List of all agents and tools available to the orchestrator`
+5. Tag: `No Tag`
+6. Chat Shortcut: `list-agents-tools`
 4. Add the prompt content:
 
 ```markdown
@@ -369,7 +367,7 @@ Keep descriptions to one line each for easy reference.
 1. Create a new chat
 2. Type `/` in the message box
 3. Select your prompt from the dropdown
-4. Press Enter
+4. Press enter to send the prompt
 
 The orchestrator will execute the prompt and generate the requested output.
 
@@ -424,44 +422,6 @@ When a workflow completes, you'll see artifacts in the chat:
 - Download artifacts as files
 - Reference artifacts in follow-up prompts
 
-## Hands-On Exercise: Create a Multi-Step Workflow
-
-Let's put everything together by creating a prompt that demonstrates orchestration.
-
-### Exercise: Research and Summarize
-
-Create a new prompt called `Research and Summarize`:
-
-```markdown
-I need you to help me research a topic and create a comprehensive summary.
-
-**Step 1: Gather Information**
-Search for relevant information about the following topic: [TOPIC]
-
-**Step 2: Analyze**
-Identify the key themes, important facts, and notable trends.
-
-**Step 3: Synthesize**
-Create a one-page executive summary with:
-- Overview (2-3 sentences)
-- Key Points (bullet list, max 5 items)
-- Implications (2-3 sentences)
-- Recommended Actions (if applicable)
-
-Format this as a downloadable markdown artifact.
-```
-
-### Test the Workflow
-
-1. Create a new chat in your `SAM_dev_demo` project
-2. Type `/` and select the `Research and Summarize` prompt
-3. Replace `[TOPIC]` with something like "event-driven architecture for AI agents"
-4. Send the message
-
-Observe how the orchestrator:
-- Breaks down the request into steps
-- Executes each step
-- Combines results into a final artifact
 
 ## What You've Learned
 
@@ -477,13 +437,11 @@ By completing this course, you now understand:
 - How to set up a new course module using the setup script
 - Creating and configuring projects
 - Creating and using reusable prompts
-- Understanding artifacts and how they flow through workflows
-- Testing multi-step workflows in the Web UI
+- Understanding artifacts
 
 ### Architectural Insights
 - Model flexibility: Different agents can use different LLMs
 - State management: Artifacts serve as shared state
-- The 80/20 rule applies: Integration and context matter more than model capability
 
 ## Common Patterns You'll See
 
@@ -525,13 +483,13 @@ Event → triggers orchestrator
 - **Projects** group related work**
 - **Prompts** enable reusable instructions
 - **Event-driven orchestration** is what makes SAM powerful in production environments
-- **The five orchestration patterns** (sequential, parallel, conditional, event-driven, human-in-the-loop) combine to create sophisticated workflows
+- **The five orchestration patterns:** sequential, parallel, conditional, event-driven, human-in-the-loop 
 
 ## Next Steps
 
 In **Course 300: Creating AI Agents**, you'll:
 - Build 5 specialized agents for the Acme Retail use case
-- Learn 5 different methods for creating agents (catalog, CLI, GUI, Context7, Strands)
+- Learn 5 different methods for creating agents (catalog, CLI, GUI, Context7, 3rd party integration)
 - Integrate agents with tools (SQL databases, MCP servers, file systems)
 - Create event gateways that connect agents to real-time events
 - Implement agent-to-agent communication (A2A protocol)

@@ -123,7 +123,7 @@ You'll work inside the directory that corresponds to the course you're taking.
   - `scripts/` — Setup and automation scripts
   - `tests/` — Automated tests framework
   - `infrastructure/` — Docker services, MCP servers, external agents
-- `.env.config` — Shared environment variables (gitignored)
+- `.env.config` — Shared environment variables (used for automated setup scripts, not required for single instances of Solace Agent Mesh)
 
 **You don't need to modify these.** They are boilerplate infrastructure.
 
@@ -239,8 +239,6 @@ You should see output indicating SAM is starting up.
 2. Click the **web icon** next to port **8000**
 3. The SAM Web UI will open in your browser
 
-Alternatively, visit: `http://127.0.0.1:8000`
-
 ## Verifying Your Installation
 
 To confirm everything is working:
@@ -317,17 +315,14 @@ The orchestrator uses artifacts as "shared state" — instead of passing raw tex
 ## Key Takeaways
 
 - **SAM makes AI agents event-driven participants** in your enterprise architecture
-- The **80/20 rule** applies: context and integration matter more than raw model capability
+- The **80/20 rule**: context and integration matter more than raw model capability
 - A **minimal SAM installation** includes an orchestrator, web UI gateway, and supporting infrastructure
-- The **`.env.config` pattern** allows configuration reuse across all course modules
-- **Projects**, **Prompts**, and **Artifacts** are core SAM concepts you'll use throughout the certification
 
 ## Next Steps
 
 In **Course 200: Orchestration**, you'll:
 - Explore the Orchestrator Agent in detail
 - Learn about orchestration patterns (sequential, parallel, conditional, event-driven)
-- Understand how workflows are structured
 - Create your first project and prompts
 
 Your SAM installation is now ready for the next course!

@@ -59,11 +59,6 @@ At the bottom of your code editor, click the `Run Course Setup` button, then sel
 - install the dependencies
 - initalize sam using the configurations we added to the `.env.config` file previously.
 
-Alternatively, you can run these commands:
-```bash
-cd /workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents
-bash ../acme-retail/scripts/300-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents
-```
 
 Once it's running, access the Web UI by naigating to the "Ports" tab and click the web icon next to port `8000`
 
@@ -222,10 +217,10 @@ The following sections walk through creating each agent step-by-step.
 ```bash
 cd /workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents/sam
 source .venv/bin/activate
-sam plugin add acme_knowledge --plugin sam-rag
 ```
 
-Or use the GUI:
+We have 2 options to add plugins:
+1. Use the GUI:
 
 ```bash
 sam plugin catalog
@@ -233,9 +228,15 @@ sam plugin catalog
 
 Select `sam-rag`, name it `acme_knowledge`, click Install.
 
+2. Use the CLI: 
+```
+sam plugin add acme_knowledge --plugin sam-rag
+```
+
+
 #### Step 2: Configure Document Path
 
-Open `configs/agents/acme_knowledge.yaml` and find the `scanner` section.
+Open `configs/agents/acme_knowledge.yaml` and find the `scanner` section. Look for the directories > document path. This points the agent towards the documents you want to include. In a real-world application you could just as easily point it towards a Google Drive folder full of live policy documents, an S3 bucket containing product specs — basically anywhere your organization's knowledge already lives. But for the purposes of this demo we’re going to use some markdown files i’ve already included in the acme-retail directory. 
 
 Add to your `.env` file:
 
@@ -249,10 +250,14 @@ This points the agent to the markdown files in `/acme-retail/data/knowledge/`.
 
 ```bash
 docker ps  # Verify qdrant/qdrant:latest is running
-docker compose up -d  # If not running
+```
+If qdrant isn't running, run:
+```
+cd acme-retail/infrastructure
+docker compose up -d
 ```
 
-This docker container spins up when you click the `Run Course Setup` button > 300-Agents 
+This docker container spins up automatically when you click the `Run Course Setup` button > 300-Agents 
 
 #### Step 4: Configure Embedding Model
 
@@ -266,6 +271,17 @@ curl $LLM_SERVICE_ENDPOINT/v1/models \
 
 Look for models with "embed" in the name (e.g., `text-embedding-ada-002`, `text-embedding-3-small`), and make a note of it.
 
+Once you've found it, add the following to your .env file:
+```
+OPENAI_API_ENDPOINT=${LLM_SERVICE_ENDPOINT}
+OPENAI_API_KEY=${LLM_SERVICE_API_KEY}
+OPENAI_MODEL_NAME="vertex-claude-4-5-sonnet"
+OPENAI_EMBEDDING_MODEL="text-embedding-ada-002" #(use whatever works for your setup) 
+
+QDRANT_URL="http://localhost:6333"
+QDRANT_COLLECTION="acme-retail-knowledge"
+```
+
 Find the embedding dimension:
 
 ```bash
@@ -278,15 +294,29 @@ curl -X POST $LLM_SERVICE_ENDPOINT/v1/embeddings \
   }' | python3 -c "import sys, json; data = json.load(sys.stdin); print(f'Embedding dimension: {len(data[\"data\"][0][\"embedding\"])}')"
 ```
 
-Then add these to your `.env.config` file:
+Add the embedding dimension to your .env file:
+```
+QDRANT_EMBEDDING_DIMENSION="1536" #(use the value for your setup) 
+```
+
+Reload your environment variables once more: 
+```
+set -a 
+source .env 
+set +a
+```
+
+Finally, add these to your `.env.config` file so they'll be picked up by the course setup automation:
 
 ```bash
+# RAG Agent Vars
+DOCUMENTS_PATH="/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/data/knowledge/"
+
 OPENAI_API_ENDPOINT=${LLM_SERVICE_ENDPOINT}
 OPENAI_API_KEY=${LLM_SERVICE_API_KEY}
 OPENAI_MODEL_NAME="vertex-claude-4-5-sonnet"
 OPENAI_EMBEDDING_MODEL="<YOUR EMBEDDING MODEL>"
 QDRANT_URL="http://localhost:6333"
-QDRANT_API_KEY=
 QDRANT_COLLECTION="acme-retail-knowledge"
 QDRANT_EMBEDDING_DIMENSION="<YOUR EMBEDDING DIMENSION>"
 ```
@@ -295,8 +325,7 @@ QDRANT_EMBEDDING_DIMENSION="<YOUR EMBEDDING DIMENSION>"
 
 #### Step 5: Restart SAM
 
-- Kill the running process (ctrl + c), `pkill -f "sam run"`, or quit the terminal window
-- Click `Run Course Setup` > 300-Agents
+- Kill the running process (ctrl + c), `pkill -f "sam run"`, or just click `Run Course Setup` > 300-Agents
 
 The RAG agent will automatically:
 - Scan the knowledge directory
@@ -329,6 +358,8 @@ This agent demonstrates the quickest way to scaffold a new agent.
 ```bash
 cd /workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents/sam
 source .venv/bin/activate
+```
+```
 sam add agent order_fulfillment_agent
 ```
 
@@ -347,8 +378,8 @@ Artifact handling mode (ignore, embed, reference) [reference]:
 Enable embed resolution? [Y/n]: y
 Enable artifact content instruction? [Y/n]: y
 Agent card description [A helpful AI assistant.]: An Agent responsible for order fulfillment that can process new orders, check order status, update order status, and cancel orders.
-Agent card default input modes (comma-separated) [text]: text, json
-Agent card default output modes (comma-separated) [text,file]: text, file, json
+Agent card default input modes (comma-separated) [text]: text,json
+Agent card default output modes (comma-separated) [text,file]: text,file,json
 Agent card skills (JSON array string) [[]]:
 Enable agent discovery? [Y/n]: y
 Agent card publishing interval (seconds) [10]:
@@ -362,25 +393,25 @@ This generates `configs/agents/order_fulfillment_agent_agent.yaml`.
 
 #### Step 2: Add Skills
 
-Open the generated YAML and add skills under `agent_card:`:
+Open the generated YAML, open the  and add skills under `agent_card:`:
 
 ```yaml
-skills:
-  - id: process_order
-    name: process_order
-    description: Validate and process new customer orders with inventory checks
-  - id: check_order_status
-    name: check_order_status
-    description: Query current order status and fulfillment progress
-  - id: update_order_status
-    name: update_order_status
-    description: Update order status and emit status change events
-  - id: cancel_order
-    name: cancel_order
-    description: Process order cancellation and update inventory
-  - id: query_orders
-    name: query_orders
-    description: Query and filter orders by status, customer, date range, or priority
+        skills: 
+          - id: process_order
+            name: process_order
+            description: Validate and process new customer orders with inventory checks
+          - id: check_order_status
+            name: check_order_status
+            description: Query current order status and fulfillment progress
+          - id: update_order_status
+            name: update_order_status
+            description: Update order status and emit status change events
+          - id: cancel_order
+            name: cancel_order
+            description: Process order cancellation and update inventory
+          - id: query_orders
+            name: query_orders
+            description: Query and filter orders by status, customer, date range, or priority
 ```
 
 Skills tell the orchestrator what this agent can do.
@@ -396,20 +427,34 @@ pip show sam-sql-database-tool
 Add the tools section:
 
 ```yaml
-tools:
-  - tool_type: python
-    component_module: "sam_sql_database_tool.tools"
-    component_base_path: .
-    class_name: "SqlDatabaseTool"
-    tool_config:
-      tool_name: "orders_db"
-      tool_description: >
-        Query the Acme Retail orders database. Use this tool for ALL data lookups
-        including orders and order items. Supports both SELECT queries and 
-        data-modifying statements (INSERT, UPDATE) for order lifecycle management.
-        IMPORTANT: This tool has access ONLY to the orders and order_items tables.
-        Do NOT attempt to access inventory, incidents, shipments, or other tables.
-      connection_string: "${ORDERS_DB_CONNECTION_STRING, postgresql://acme:acme@localhost:5432/orders}"
+      tools:
+        - tool_type: python
+          component_module: "sam_sql_database_tool.tools"
+          component_base_path: .
+          class_name: "SqlDatabaseTool"
+          tool_config:
+            tool_name: "orders_db"
+            tool_description: >
+              Query the Acme Retail orders database. Use this tool for ALL data lookups
+              including orders and order items. Supports both SELECT queries and 
+              data-modifying statements (INSERT, UPDATE) for order lifecycle management.
+              IMPORTANT: This tool has access ONLY to the orders and order_items tables.
+              Do NOT attempt to access inventory, incidents, shipments, or other tables.
+            connection_string: "${ORDERS_DB_CONNECTION_STRING, postgresql://acme:acme@localhost:5432/orders}"
+        - tool_type: builtin
+          tool_name: create_chart_from_plotly_config
+      
+        - tool_type: builtin
+          tool_name: load_artifact
+        
+        - tool_type: builtin
+          tool_name: list_artifacts
+```
+
+We'll also need to configure the Session Persistence and Artifact tools, otherwise the agent wont be able to save reports. So under the `artifact_service:` block, add the following:
+```
+enable_builtin_artifact_tools:
+  enabled: true
 ```
 
 #### Step 4: Configure the Instruction
@@ -417,18 +462,47 @@ tools:
 Replace the default instruction:
 
 ```yaml
-instruction: |
-  You are an Order Fulfillment Agent responsible for processing customer orders, managing order lifecycles, and coordinating with inventory and logistics systems.
+      instruction: |
+        You are an Order Fulfillment Agent responsible for processing customer orders,
+        managing order lifecycles, and coordinating with inventory and logistics systems.
 
-  Your primary responsibilities:
-  1. Handle new orders by checking inventory availability and saving each order with status 'validated' if stock is sufficient, or 'blocked' if not.
-  2. Track and update order status as orders progress through the fulfillment lifecycle (pending → validated → processing → shipped → delivered) — but only advance status in response to explicit lifecycle events.
-  3. Handle order cancellations by updating the order status to 'cancelled'.
-  4. Query orders by status, customer, date range, or other criteria.
-  5. React to inventory update events to re-validate blocked orders when stock becomes available, updating their status to 'validated'.
-  6. React to shipment delay events by updating the estimated_delivery field ONLY. Do not create incident records — the IncidentResponseAgent is solely responsible for incident creation.
-  
-  DOMAIN RESTRICTION: You have access ONLY to the orders and order_items tables. Never attempt to modify inventory, incidents, or shipments tables.
+        You will receive messages with an EVENT_TYPE and a PAYLOAD. React to each event
+        type as follows:
+
+        ## EVENT_TYPE: order_created
+        A new customer order has been received.
+        1. Parse the order and its line items from the PAYLOAD.
+        2. For each item, query the inventory table to check available stock.
+        3. If ALL items have sufficient stock, set order status = 'validated'.
+        4. If ANY item is out of stock, set order status = 'blocked'.
+        5. Save the order to the database with the determined status.
+        6. Do NOT create incident records.
+
+        ## EVENT_TYPE: inventory_updated
+        An inventory update has occurred. Re-evaluate blocked orders.
+        1. Query the database for all orders with status = 'blocked'.
+        2. For each blocked order, check the inventory table for each of its items.
+        3. If all items now have sufficient stock, update that order's status to 'validated'.
+        4. If no blocked orders can be fulfilled, report that all blocked orders remain blocked.
+        5. Do NOT create incident records.
+
+        ## EVENT_TYPE: shipment_delayed
+        A shipment has been delayed.
+        1. Extract the tracking_number, delay_hours, carrier, and new delivery date from the PAYLOAD.
+        2. Find the order associated with the tracking number in the shipments table.
+        3. Update the estimated_delivery field on that order to the new delivery date.
+        4. Do NOT create an incident record — the IncidentResponseAgent handles that.
+
+        ## EVENT_TYPE: order_cancelled
+        An order cancellation has been received.
+        1. Extract the order_id and reason from the PAYLOAD.
+        2. Update the order's status to 'cancelled' in the database.
+        3. Do NOT create incident records.
+
+        ## General Rules
+        - Only advance order status in response to an explicit lifecycle event.
+        - Never insert, update, or delete incident records — that is solely the IncidentResponseAgent's responsibility.
+        - If an event type is unrecognized, log it and take no action.
 ```
 
 
@@ -452,7 +526,7 @@ sam plugin add acme-order-events --plugin sam-event-mesh-gateway
 
 Open `configs/gateways/acme-order-events.yaml`.
 
-Replace the inline shared_config block with:
+Delete the inline shared_config block, and uncomment line:
 
 ```yaml
 !include ../shared_config.yaml
@@ -461,22 +535,117 @@ Replace the inline shared_config block with:
 Update the broker config:
 
 ```yaml
-event_mesh_broker_config:
-  broker_url: ${SOLACE_BROKER_URL}
-  broker_username: ${SOLACE_BROKER_USERNAME, admin}
-  broker_password: ${SOLACE_BROKER_PASSWORD, admin}
-  broker_vpn: ${SOLACE_BROKER_VPN, default}
+      event_mesh_broker_config:
+        broker_url: ${SOLACE_BROKER_URL} 
+        broker_vpn: ${SOLACE_BROKER_VPN}
+        broker_username: ${SOLACE_BROKER_USERNAME}
+        broker_password: ${SOLACE_BROKER_PASSWORD}
 ```
 
-Add event handlers (see `/300-Agents/sam/configs/gateways/acme-order-events.yaml` for complete config).
+Update the event handlers:
+```
+      event_handlers:
+        # ── 1. New order created ──────────────────────────────────────
+        - name: "order_created_handler"
+          default_user_identity: "anonymous_event_mesh_user"
+          subscriptions:
+            - topic: "acme/orders/created"
+              qos: 1
+          input_expression: >
+            template:EVENT_TYPE:order_created
+            PAYLOAD:{{text://input.payload}}
+          payload_encoding: "utf-8"
+          payload_format: "json"
+          target_agent_name: "OrderFulfillment"
+          on_success: "order_decision_handler"
+          on_error: "error_handler"
+          forward_context:
+            order_id: "input.payload:order_id"
 
-#### Every event handler needs:
+        # ── 2. Inventory updated — re-check blocked orders ────────────
+        - name: "inventory_updated_handler"
+          default_user_identity: "anonymous_event_mesh_user"
+          subscriptions:
+            - topic: "acme/inventory/updated"
+              qos: 1
+          input_expression: >
+            template:EVENT_TYPE:inventory_updated
+            PAYLOAD:{{text://input.payload}}
+          payload_encoding: "utf-8"
+          payload_format: "json"
+          target_agent_name: "OrderFulfillment"
+          on_success: "order_decision_handler"
+          on_error: "error_handler"
+          forward_context:
+            item_id: "input.payload:item_id"
+
+        # ── 3. Shipment delayed ───────────────────────────────────────
+        - name: "shipment_delayed_handler"
+          default_user_identity: "anonymous_event_mesh_user"
+          subscriptions:
+            - topic: "acme/logistics/shipment-delayed"
+              qos: 1
+          input_expression: >
+            template:EVENT_TYPE:shipment_delayed
+            PAYLOAD:{{text://input.payload}}
+          payload_encoding: "utf-8"
+          payload_format: "json"
+          target_agent_name: "OrderFulfillment"
+          on_success: "order_decision_handler"
+          on_error: "error_handler"
+          forward_context:
+            tracking_number: "input.payload:tracking_number"
+
+        # ── 4. Order cancelled ────────────────────────────────────────
+        - name: "order_cancelled_handler"
+          default_user_identity: "anonymous_event_mesh_user"
+          subscriptions:
+            - topic: "acme/orders/cancelled"
+              qos: 1
+          input_expression: >
+            template:EVENT_TYPE:order_cancelled
+            PAYLOAD:{{text://input.payload}}
+          payload_encoding: "utf-8"
+          payload_format: "json"
+          target_agent_name: "OrderFulfillment"
+          on_success: "order_decision_handler"
+          on_error: "error_handler"
+          forward_context:
+            order_id: "input.payload:order_id"
+```
+
+#### Note: Every event handler needs:
 
 ```yaml
 default_user_identity: "anonymous_event_mesh_user"
 ```
 
 Without this, SAM silently discards events (no error, agent just never responds).
+
+Finally, update the output handlers:
+```
+      output_handlers:
+        # Publishes validated or blocked decision back to the mesh
+        - name: "order_decision_handler"
+          topic_expression: "static:acme/orders/decision"
+          payload_expression: "task_response:text"
+          payload_encoding: "utf-8"
+          payload_format: "json"
+
+        # Publishes incident created confirmation
+        - name: "incident_created_handler"
+          topic_expression: "static:acme/incidents/created"
+          payload_expression: "task_response:text"
+          payload_encoding: "utf-8"
+          payload_format: "json"
+
+        # Error handler — publishes failures for observability
+        - name: "error_handler"
+          topic_expression: "static:acme/orders/errors"
+          payload_expression: "task_response:text"
+          payload_encoding: "utf-8"
+          payload_format: "json"
+```
 
 #### Step 7: Restart and Test Events
 
@@ -496,7 +665,6 @@ This agent demonstrates GUI agent creation and integrating MCP tools.
 **Model Context Protocol** is an open standard that lets AI agents connect to external tool servers:
 - **MCP Postgres**: Query and update PostgreSQL databases
 - **MCP Filesystem**: Read and write files
-- **Custom MCP servers**: Build your own integrations
 
 Instead of writing a custom Python plugin, you point SAM at an MCP server and it automatically discovers available tools.
 
@@ -505,71 +673,118 @@ Instead of writing a custom Python plugin, you point SAM at an MCP server and it
 ```bash
 cd /workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents/sam
 source .venv/bin/activate
+```
+```
 sam add agent --gui
 ```
 
-If you see the initialization page instead of the agent config page, add `?config_mode=addAgent` to the URL.
+If your taking the course through a github code space, you may see the initialization page instead of the agent config page, add `?config_mode=addAgent` to the URL, and it will bring you to the right page
 
 #### Step 2: Configure Agent Details
 
-- **Agent Name**: `inventory_management_agent`
-- **Display Name**: Inventory Management Agent
-- **Input Modes**: text, json
-- **Output Modes**: text, json, file
-- **Enable Agent Discovery**: Yes
-- **Inter-Agent Timeout**: 60 seconds
-
-#### Step 3: Add the Instruction
-
+- **Agent Name**: `InventoryManagement`
+- **A2A Namespace**: ${NAMESPACE}
+- **Model Type**: General Model (*general_model)
+- **Instruction**:
 ```
-You are an Inventory Management Agent responsible for monitoring Acme Retail's product inventory, processing stock adjustments, and notifying other agents of stock level changes.
+        You are an Inventory Management Agent responsible for monitoring Acme Retail's
+        product inventory, processing stock adjustments, and notifying other agents
+        of stock level changes.
 
-The inventory table has these columns: item_id, product_name, category, stock_quantity, reserved_quantity, available_quantity, reorder_level, reorder_quantity, unit_cost, unit_price, warehouse_location, supplier_id, supplier_name, last_restocked, expected_restock_date, status, incident_id.
+        The inventory table has these columns:
+        item_id, product_name, category, stock_quantity, reserved_quantity,
+        available_quantity, reorder_level, reorder_quantity, unit_cost, unit_price,
+        warehouse_location, supplier_id, supplier_name, last_restocked,
+        expected_restock_date, status, incident_id.
 
-Your primary responsibilities:
-1. Query inventory levels for individual SKUs, categories, suppliers, or warehouse locations using SELECT queries on the inventory table.
-2. Apply stock adjustments when new stock arrives or quantities change: execute a SINGLE UPDATE query that sets stock_quantity, available_quantity, last_restocked, AND status all at once — never split this into two queries. Compute status inline with a CASE expression: 'out_of_stock' when the new available_quantity = 0, 'low_stock' when new available_quantity > 0 and <= reorder_level, 'in_stock' when new available_quantity > reorder_level.
-3. Identify items needing reorder by finding rows where available_quantity <= reorder_level, and produce reorder recommendations using each item's reorder_quantity as the suggested order size.
-4. Generate inventory reports and charts on demand — by category, warehouse, supplier, or status — and save report files to /tmp/inventory-reports/.
-5. Only modify the inventory table. Never insert, update, or delete rows in any other table (orders, shipments, incidents, etc.).
+        You will receive messages with an EVENT_TYPE and a PAYLOAD. React to each event
+        type as follows:
 
-Data integrity rule: All quantities, product names, and status values in responses must come directly from query results. Never estimate, round, paraphrase, or recall values from memory. When reporting stock levels, always use available_quantity (not stock_quantity) as the measure of usable stock.
+        ## EVENT_TYPE: restock_received
+        A supplier has delivered new stock for a SKU.
+        1. Extract item_id, quantity_received, and supplier_name from the PAYLOAD.
+        2. Execute a SINGLE UPDATE query on the inventory table that does all of the
+           following at once — never split this into two queries:
+           - Adds quantity_received to both stock_quantity and available_quantity.
+           - Sets last_restocked = NOW().
+           - Sets status using an inline CASE expression based on the new available_quantity:
+               'out_of_stock' when new available_quantity = 0,
+               'low_stock'    when new available_quantity > 0 AND <= reorder_level,
+               'in_stock'     when new available_quantity > reorder_level.
+           WHERE item_id matches the value from the PAYLOAD.
+        3. Report the updated inventory record after the operation completes.
+
+        ## EVENT_TYPE: inventory_adjustment
+        A manual stock correction or write-off has been received.
+        1. Extract item_id, quantity_delta, adjustment_type, and reason from the PAYLOAD.
+           Note: quantity_delta may be negative (write-off) or positive (correction).
+        2. Execute a SINGLE UPDATE query on the inventory table that does all of the
+           following at once — never split this into two queries:
+           - Adds quantity_delta to both stock_quantity and available_quantity.
+           - Sets status using an inline CASE expression based on the new available_quantity
+             (same CASE logic as restock_received above).
+           - Do NOT update last_restocked for adjustments.
+           WHERE item_id matches the value from the PAYLOAD.
+        3. Report the updated inventory record after the operation completes.
+
+        ## General Responsibilities
+        1. Query inventory levels for individual SKUs, categories, suppliers, or warehouse
+           locations using SELECT queries on the inventory table.
+        2. Identify items needing reorder by finding rows where available_quantity <=
+           reorder_level, and produce reorder recommendations using each item's
+           reorder_quantity as the suggested order size.
+        3. Generate inventory reports and charts on demand — by category, warehouse,
+           supplier, or status — and save report files to /tmp/inventory-reports/.
+        4. Only modify the inventory table. Never insert, update, or delete rows in any
+           other table (orders, shipments, incidents, etc.).
+
+        ## Data Integrity Rules
+        - All quantities, product names, and status values in responses, summaries, and
+          chart data must come directly from query results. Never estimate, round,
+          paraphrase, or recall values from memory — always read them from the database first.
+        - When reporting or summarizing stock levels, always use available_quantity
+          (not stock_quantity) as the measure of usable stock.
+        - If an event type is unrecognized, log it and take no action.
+```
+- **Suports Streaming**: ✅
+- **Artifact Service Configuration**: Use Default (from shared_config.yaml)
+- **Artifact Handling Mode**: Reference (Include artifact fetch URI in A2A messages)
+- **Enable Embed Resolution**: ✅
+- **Enable Artifact Content Instruction**: ✅
+
+#### Step 3: Add Custom Tool
+1. Click "Add Tool"
+2. Select `Single builtin tool`
+3. Select `create_chart_from_plotly_config`
+4. Click "Add Tool"
+
+#### Step 4: Configure Agent Card & Discovery
+- **Give the agent Card a description**:
+```
+An Agent responsible for monitoring and managing Acme Retail's product inventory. This agent checks stock levels, processes adjustments, identifies reorder needs, and publishes inventory update events to the order fulfillment pipeline.  
+```
+- **Default Input Modes**: `text`
+- **Default Output Modes**: `text,file,json`
+
+
+#### Step 5: Add Skills
+```
+  - Skill ID: check_inventory
+    Skill Name: check_inventory
+    Skill Description: Query stock levels by SKU, category, supplier, or warehouse location
+  - Skill ID: adjust_stock
+    Skill Name: adjust_stock
+    Skill Description: Apply stock adjustments and update inventory status
+  - Skill ID: reorder_recommendations
+    Skill Name: reorder_recommendations
+    Skill Description: Identify items below reorder level and generate suggested purchase quantities
+  - Skill ID: inventory_report
+    Skill Name: inventory_report
+    Skill Description: Generate inventory reports and charts
 ```
 
-**Why the detailed instruction?**:
-- MCP postgres doesn't inject schema context automatically (unlike SqlDatabaseTool)
-- Listing columns prevents hallucination of non-existent fields
-- The "SINGLE UPDATE" directive prevents race conditions
-- Data integrity rule prevents LLM from making up numbers
-
-Then add a description to the agent card
-```
-An Agent responsible for monitoring and managing Acme Retail's product inventory. This agent checks stock levels, processes adjustments, identifies reorder needs, and publishes inventory update events to the order fulfillment pipeline.
-```
-
-#### Step 4: Add Skills
-
-```yaml
-skills:
-  - id: check_inventory
-    name: check_inventory
-    description: Query stock levels by SKU, category, supplier, or warehouse location
-  - id: adjust_stock
-    name: adjust_stock
-    description: Apply stock adjustments and update inventory status
-  - id: reorder_recommendations
-    name: reorder_recommendations
-    description: Identify items below reorder level and generate suggested purchase quantities
-  - id: inventory_report
-    name: inventory_report
-    description: Generate inventory reports and charts
-```
-
-#### Step 5: Add Builtin Tool
-
-Add `create_chart_from_plotly_config` (for generating inventory charts).
-
-Save the agent.
+- **Inter-Agent Request Timeout (seconds)**: 60
+- **Click** `Save Agent and Finish`
 
 #### Step 6: Understanding MCP Tools
 
@@ -602,37 +817,26 @@ From the agent's perspective, all tools—builtins, Python plugins, and MCP serv
 Open `configs/agents/inventory_management_agent_agent.yaml` and add the MCP tools below the builtin tools:
 
 ```yaml
-tools:
-  - tool_type: builtin-group
-    group_name: artifact_management
-  
-  - tool_type: builtin
-    tool_name: create_chart_from_plotly_config
-  
-  # Custom read-write MCP Postgres server
-  - tool_type: mcp
-    connection_params:
-      type: stdio
-      command: "node"
-      args:
-        - "./mcp_postgres_rw.js"
-        - "postgresql://acme:acme@localhost:5432/orders"
-      timeout: 30
-    tool_name_prefix: "postgres"
-  
-  # MCP Filesystem server (sandboxed to /tmp/inventory-reports)
-  - tool_type: mcp
-    connection_params:
-      type: stdio
-      command: "./node_modules/.bin/mcp-server-filesystem"
-      args:
-        - "/tmp/inventory-reports"
-      timeout: 30
-    tool_name_prefix: "filesystem"
-    allow_list:
-      - "write_file"
-      - "read_file"
-      - "list_directory"
+        - tool_type: mcp
+          connection_params:
+            type: stdio
+            command: "node"
+            args:
+              - "/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/infrastructure/mcp_postgres_rw.js"
+              - "postgresql://acme:acme@localhost:5432/orders"
+            timeout: 30
+
+        - tool_type: mcp
+          connection_params:
+            type: stdio
+            command: "/workspaces/Solace_Academy_SAM_Dev_Demo/acme-retail/infrastructure/node_modules/.bin/mcp-server-filesystem"
+            args:
+              - "/tmp/inventory-reports"
+            timeout: 30
+          allow_list:
+            - "write_file"
+            - "read_file"
+            - "list_directory"
 ```
 
 **Configuration Details**:
@@ -642,8 +846,7 @@ tools:
 
 #### Step 8: Restart SAM and Test
 
-- Kill the running process (ctrl + c), `pkill -f "sam run"`, or quit the terminal window
-- Click `Run Course Setup` > 300-Agents
+- Kill the running process (ctrl + c), `pkill -f "sam run"`, or click `Run Course Setup` > 300-Agents
 
 Ask the agent:
 
@@ -651,6 +854,103 @@ Ask the agent:
 
 The agent should query the inventory table and return the available_quantity.
 
+#### Step 9: Add Event Mesh Gateway
+
+Create the gateway that connects events to this agent:
+
+```bash
+sam plugin add acme-inventory-events --plugin sam-event-mesh-gateway
+```
+
+Open `configs/gateways/acme-inventory-events.yaml`.
+
+Delete the inline shared_config block, and uncomment line:
+
+```yaml
+!include ../shared_config.yaml
+```
+
+Update the broker config:
+
+```yaml
+      event_mesh_broker_config:
+        broker_url: ${SOLACE_BROKER_URL} 
+        broker_vpn: ${SOLACE_BROKER_VPN}
+        broker_username: ${SOLACE_BROKER_USERNAME}
+        broker_password: ${SOLACE_BROKER_PASSWORD}
+```
+
+Update the event handlers:
+```
+      event_handlers:
+        # ── 1. Supplier restock received — update inventory quantities ────────
+        - name: "restock_received_handler"
+          default_user_identity: "anonymous_event_mesh_user"
+          subscriptions:
+            - topic: "acme/suppliers/restock-received"
+              qos: 1
+          input_expression: >
+            template:EVENT_TYPE:restock_received
+            PAYLOAD:{{text://input.payload}}
+          payload_encoding: "utf-8"
+          payload_format: "json"
+          target_agent_name: "InventoryManagement"
+          on_success: "inventory_updated_publisher"
+          on_error: "error_handler"
+          forward_context:
+            item_id: "input.payload:item_id"
+
+        # ── 2. Inventory adjustment — write-offs and manual corrections ───────
+        - name: "inventory_adjustment_handler"
+          default_user_identity: "anonymous_event_mesh_user"
+          subscriptions:
+            - topic: "acme/inventory/adjustment"
+              qos: 1
+          input_expression: >
+            template:EVENT_TYPE:inventory_adjustment
+            PAYLOAD:{{text://input.payload}}
+          payload_encoding: "utf-8"
+          payload_format: "json"
+          target_agent_name: "InventoryManagement"
+          on_success: "inventory_updated_publisher"
+          on_error: "error_handler"
+          forward_context:
+            item_id: "input.payload:item_id"
+```
+
+#### Note: Every event handler needs:
+
+```yaml
+default_user_identity: "anonymous_event_mesh_user"
+```
+
+Without this, SAM silently discards events (no error, agent just never responds).
+
+Finally, update the output handlers:
+```
+      output_handlers:
+        # Publishes inventory update event — consumed by OrderFulfillmentAgent to unblock orders
+        - name: "inventory_updated_publisher"
+          topic_expression: "static:acme/inventory/updated"
+          payload_expression: "task_response:text"
+          payload_encoding: "utf-8"
+          payload_format: "json"
+
+        # Error handler — publishes failures for observability
+        - name: "error_handler"
+          topic_expression: "static:acme/inventory/errors"
+          payload_expression: "task_response:text"
+          payload_encoding: "utf-8"
+          payload_format: "json"
+```
+
+#### Step 7: Restart and Test Events
+
+- Kill the running process (ctrl + c), `pkill -f "sam run"`, or click `Run Course Setup` > 300-Agents
+
+Click the "Simulate Events" button > `3. Inventory Management` to test your agent is now event enabled.
+
+---
 ---
 
 ### Agent 4: IncidentResponseAgent
@@ -666,6 +966,9 @@ Context7 is an MCP server that queries documentation in real-time.
 #### Step 1: Install OpenCode
 
 OpenCode is a CLI tool that integrates with Context7 and works with various LLM providers:
+```bash
+cd 300-Agents/sam/
+```
 
 ```bash
 sudo npm install -g opencode-ai@1.3.2
@@ -676,7 +979,6 @@ sudo npm install -g opencode-ai@1.3.2
 **For standard LLM providers (OpenAI, Anthropic, Google):**
 
 ```bash
-cd /workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents/sam
 opencode
 ```
 
@@ -700,7 +1002,7 @@ Exit OpenCode and create `opencode.json` in the `300-Agents` directory:
 ```
 
 **For LiteLLM proxy users:**
-If you're using a LiteLLM proxy, the `/connect` flow won't work because the proxy key isn't a real provider key. Instead, exit OpenCode and open your config file. Add this block, replacing the baseURL and apiKey with your proxy's values if they differ from the course defaults:
+If you're using a LiteLLM proxy, the `/connect` flow won't work because the proxy key isn't a real provider key. Instead, exit OpenCode and open your config file. Create a `opencode.json` file in the `300-Agents/sam` directory and add this block, replacing the baseURL and apiKey with your proxy's values if they differ from the course defaults:
 
 ```json
 {

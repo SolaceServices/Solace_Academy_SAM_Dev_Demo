@@ -2,6 +2,14 @@
 test_incident_response_parallel.py — PARALLEL version with beautiful UI.
 
 Runs all 5 tests concurrently with a live progress table and clean output.
+
+Each test owns a unique identifier embedded in its event payload, and
+asserts on rows in the database that contain that identifier. This avoids
+all forms of cross-test interference under parallel execution.
+
+Diagnostic mode: when a test's broker check or DB check fails, the captured
+broker message (if any) is dumped to stderr so you can see exactly what
+the agent returned. Look for a `[diag tN]` prefix in the test output.
 """
 
 import sys
@@ -34,6 +42,16 @@ HIGH_SEV_ITEM_NAME = "Pro Tablet 12"
 LOW_SEV_INCIDENT_ID = "INC-2026-018"
 LOW_SEV_INCIDENT_STATUS = "investigating"
 
+# Test 2 marker (validated order — should NOT create an incident).
+TEST2_ORDER_ID = "ORD-TEST-VALIDATED-MOUSE-002"
+
+# Test 4 marker (inventory error). The agent's `description` will include
+# the stringified payload, so this string will land in the `description`
+# column and we can find OUR incident specifically.
+TEST4_ERROR_MARKER = "test4-marker-db-timeout-acme-incidents"
+
+# Test 5 markers (shipment delay). Tracking number flows into `description`
+# via the agent's logistics_updated procedure, so we can identify our row.
 TEST5_SHIPMENT_ID = "SHIP-2026-0051"
 TEST5_TRACKING_NUMBER = "1Z999AA10123456795"
 
@@ -43,10 +61,129 @@ TOPIC_INVENTORY_UPDATED   = "acme/inventory/updated"
 TOPIC_INVENTORY_ERRORS    = "acme/inventory/errors"
 TOPIC_INCIDENTS_RESPONSE  = "acme/incidents/response"
 TOPIC_LOGISTICS_UPDATED   = "acme/logistics/updated"
-TOPIC_LOGISTICS_DELAYED   = "acme/logistics/shipment-delayed"
+TOPIC_LOGISTICS_DELAYED   = "acme/logistics/updated"
 
-AGENT_TIMEOUT_S  = 90
+AGENT_TIMEOUT_S  = 180
 POST_MSG_SLEEP_S = 3
+DB_POLL_DEADLINE_S = 90   # How long to keep polling the DB for our row
+DB_POLL_INTERVAL_S = 1
+
+
+# ── DB helpers ─────────────────────────────────────────────────────────────
+DB_DSN = "postgresql://acme:acme@localhost:5432/orders"
+
+
+def _poll_for_row(query, params, deadline_s=DB_POLL_DEADLINE_S):
+    """Poll the DB for a row matching `query`+`params`. Returns the first
+    matching row, or None if the deadline elapses. Used because the agent's
+    INSERT may land slightly after the broker reply."""
+    deadline = time.monotonic() + deadline_s
+    while time.monotonic() < deadline:
+        conn = psycopg2.connect(DB_DSN)
+        try:
+            cur = conn.cursor()
+            cur.execute(query, params)
+            row = cur.fetchone()
+        finally:
+            conn.close()
+        if row:
+            return row
+        time.sleep(DB_POLL_INTERVAL_S)
+    return None
+
+
+# ── Diagnostic helpers ─────────────────────────────────────────────────────
+def _diag(test_num, label, payload):
+    """Emit a diagnostic dump on test failure. Goes to stderr so it's
+    visible even when the pretty UI is rendering on stdout."""
+    sep = "─" * 60
+    print(f"\n[diag t{test_num}] {label}", file=sys.stderr)
+    print(f"[diag t{test_num}] {sep}", file=sys.stderr)
+    if payload is None:
+        print(f"[diag t{test_num}] (no broker message captured)", file=sys.stderr)
+    else:
+        try:
+            pretty = json.dumps(payload, indent=2, default=str)
+        except (TypeError, ValueError):
+            pretty = repr(payload)
+        for line in pretty.splitlines():
+            print(f"[diag t{test_num}] {line}", file=sys.stderr)
+    print(f"[diag t{test_num}] {sep}\n", file=sys.stderr)
+
+
+def _diag_db_snapshot(test_num, query, params, label):
+    """Dump matching rows from the DB so we can see what (if anything)
+    the agent persisted. Useful when a DB lookup misses."""
+    sep = "─" * 60
+    print(f"\n[diag t{test_num}] DB snapshot: {label}", file=sys.stderr)
+    print(f"[diag t{test_num}] {sep}", file=sys.stderr)
+    try:
+        conn = psycopg2.connect(DB_DSN)
+        try:
+            cur = conn.cursor()
+            cur.execute(query, params)
+            rows = cur.fetchall()
+            cols = [d[0] for d in cur.description] if cur.description else []
+        finally:
+            conn.close()
+        if not rows:
+            print(f"[diag t{test_num}] (no rows match)", file=sys.stderr)
+        else:
+            print(f"[diag t{test_num}] columns: {cols}", file=sys.stderr)
+            for r in rows[:10]:
+                print(f"[diag t{test_num}] {r}", file=sys.stderr)
+            if len(rows) > 10:
+                print(f"[diag t{test_num}] ... ({len(rows) - 10} more)", file=sys.stderr)
+    except Exception as exc:
+        print(f"[diag t{test_num}] DB snapshot failed: {exc}", file=sys.stderr)
+    print(f"[diag t{test_num}] {sep}\n", file=sys.stderr)
+
+
+# ── Predicate helpers ──────────────────────────────────────────────────────
+def _parse_msg(msg):
+    """Return msg as a dict if possible, else None."""
+    if msg is None:
+        return None
+    if isinstance(msg, dict):
+        return msg
+    try:
+        return json.loads(msg if isinstance(msg, str) else json.dumps(msg))
+    except (TypeError, ValueError):
+        return None
+
+
+def _is_created_with_marker(msg, marker):
+    """True iff the agent reported a successful CREATE (not no_action /
+    error) and either the marker appears anywhere in the message, OR the
+    message has action='created' with the right type/title.
+
+    Stricter than a substring match on 'system_error': the word
+    'system_error' can appear in a no_action `reason` field or an `error`
+    field, which would otherwise let a non-create response pass."""
+    blob = json.dumps(msg, default=str)
+    parsed = _parse_msg(msg)
+
+    # Strongest signal: the unique marker survived into the response.
+    if marker in blob:
+        # But still require it to be a create — if the model returned
+        # an error mentioning the marker, the test should not pass.
+        if parsed is None:
+            # Couldn't parse — accept the marker hit on faith.
+            return True
+        if parsed.get("action") in (None, "created"):
+            return True
+        # action is 'no_action' or 'error' — don't accept even with marker.
+        return False
+
+    # Fallback: action=created plus the right type or title.
+    if parsed is not None and parsed.get("action") == "created":
+        if parsed.get("type") == "system_error":
+            return True
+        title = (parsed.get("title") or "").lower()
+        if "system error" in title:
+            return True
+
+    return False
 
 
 # ── Test Functions ─────────────────────────────────────────────────────────
@@ -81,38 +218,35 @@ def test_1_blocked_order_creates_incident(results: ResultCollector, lock: thread
         progress.update_status(test_num, "❌", time.monotonic() - start)
         with lock:
             results.record("t1_response_received", False, str(exc))
+        _diag(test_num, "scenario raised exception (no broker message)", None)
         return
 
     with lock:
         with results.test("t1_response_received", label="Message received on broker"):
+            if msg is None:
+                _diag(test_num, "broker check failed: no message captured", msg)
             assert msg is not None
 
     time.sleep(POST_MSG_SLEEP_S)
 
     with lock:
         with results.test("t1_incident_created_type", label="New inventory_shortage incident created for SKU-KEYBOARD-101"):
-            try:
-                # Check for incident linked to SKU-KEYBOARD-101 (not count-based to avoid parallel conflicts)
-                # The incident might be linked via incident_items table
-                max_retries = 3
-                incident_found = False
-                for attempt in range(max_retries):
-                    # Check if there's an incident_items entry for SKU-KEYBOARD-101
-                    incident_items_count = row_count(
-                        "incident_items", "item_id = %s", (sku_to_check,)
-                    )
-                    if incident_items_count > 0:
-                        incident_found = True
-                        break
-                    if attempt < max_retries - 1:
-                        time.sleep(2)  # Wait 2s before retry
-
-                assert incident_found, (
-                    f"No incident was created for {sku_to_check}. "
-                    f"Expected to find an entry in incident_items table."
+            row = _poll_for_row(
+                "SELECT id FROM incident_items WHERE item_id = %s LIMIT 1",
+                (sku_to_check,),
+            )
+            if row is None:
+                _diag(test_num, "DB check failed — broker message was:", msg)
+                _diag_db_snapshot(
+                    test_num,
+                    "SELECT id, incident_id, item_id FROM incident_items WHERE item_id = %s",
+                    (sku_to_check,),
+                    f"incident_items where item_id={sku_to_check}",
                 )
-            except Exception as exc:
-                assert False, str(exc)
+            assert row is not None, (
+                f"No incident_items entry was created for {sku_to_check} "
+                f"within {DB_POLL_DEADLINE_S}s of the broker reply."
+            )
 
     elapsed = time.monotonic() - start
     progress.update_status(test_num, "✅", elapsed)
@@ -127,42 +261,57 @@ def test_2_validated_order_no_incident(results: ResultCollector, lock: threading
 
     msg = None
 
-    inventory_shortage_count_before = row_count(
-        "incidents", "type = %s", ("inventory_shortage",)
-    )
-
     try:
         msg = _run_scenario(
             sub_topic=TOPIC_INCIDENTS_CREATED,
             pub_topic=TOPIC_ORDERS_DECISION,
             pub_payload={
-                "order_id": "ORD-TEST-VALIDATED-001",
+                "order_id": TEST2_ORDER_ID,
                 "item_id": "SKU-MOUSE-042",
                 "product_name": "Wireless Mouse",
                 "status": "validated",
                 "reason": "Sufficient stock available",
                 "message": (
-                    "Order ORD-TEST-VALIDATED-001 has been validated. "
+                    f"Order {TEST2_ORDER_ID} has been validated. "
                     "Sufficient stock is available for all items."
                 ),
             },
-            predicate=lambda msg: "inventory_shortage" in json.dumps(msg).lower(),
-            timeout_s=5,  # Short timeout since we expect no message
+            # We expect NO matching message — short timeout is fine.
+            predicate=lambda msg: TEST2_ORDER_ID in json.dumps(msg),
+            timeout_s=5,
         )
     except Exception:
-        # Expected to timeout since no incident should be created
+        # Expected — no incident should be created, so no broker reply.
         msg = None
 
     time.sleep(POST_MSG_SLEEP_S)
 
     with lock:
         with results.test("t2_no_incident_created", label="No inventory_shortage incident created for validated order"):
-            inventory_shortage_count_after = row_count(
-                "incidents", "type = %s", ("inventory_shortage",)
-            )
-            assert inventory_shortage_count_after == inventory_shortage_count_before, (
-                f"Unexpected inventory_shortage incident created for validated order "
-                f"(before={inventory_shortage_count_before}, after={inventory_shortage_count_after})"
+            conn = psycopg2.connect(DB_DSN)
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT incident_id, description FROM incidents "
+                    "WHERE type = 'inventory_shortage' "
+                    "  AND description LIKE %s",
+                    (f"%{TEST2_ORDER_ID}%",),
+                )
+                row = cur.fetchone()
+            finally:
+                conn.close()
+            if row is not None:
+                _diag(test_num, "unexpected incident found — broker message was:", msg)
+                _diag_db_snapshot(
+                    test_num,
+                    "SELECT incident_id, type, severity, status, description "
+                    "FROM incidents WHERE description LIKE %s",
+                    (f"%{TEST2_ORDER_ID}%",),
+                    f"any incident referencing {TEST2_ORDER_ID}",
+                )
+            assert row is None, (
+                f"Unexpected inventory_shortage incident was created for "
+                f"validated order {TEST2_ORDER_ID}: {row}"
             )
 
     elapsed = time.monotonic() - start
@@ -198,20 +347,36 @@ def test_3_inventory_restock_updates_incident(results: ResultCollector, lock: th
         progress.update_status(test_num, "❌", time.monotonic() - start)
         with lock:
             results.record("t3_response_received", False, str(exc))
+        _diag(test_num, "scenario raised exception (no broker message)", None)
         return
 
     with lock:
         with results.test("t3_response_received", label="Message received on broker"):
+            if msg is None:
+                _diag(test_num, "broker check failed: no message captured", msg)
             assert msg is not None
 
     time.sleep(POST_MSG_SLEEP_S)
 
     with lock:
         with results.test("t3_incident_status_updated", label=f"Incident {HIGH_SEV_INCIDENT_ID} status updated to 'monitoring'"):
-            try:
-                assert_field_equals("incidents", "incident_id", HIGH_SEV_INCIDENT_ID, "status", "monitoring")
-            except Exception as exc:
-                assert False, str(exc)
+            row = _poll_for_row(
+                "SELECT status FROM incidents WHERE incident_id = %s",
+                (HIGH_SEV_INCIDENT_ID,),
+            )
+            if row is None or row[0] != "monitoring":
+                _diag(test_num, "DB check failed — broker message was:", msg)
+                _diag_db_snapshot(
+                    test_num,
+                    "SELECT incident_id, status, last_updated FROM incidents WHERE incident_id = %s",
+                    (HIGH_SEV_INCIDENT_ID,),
+                    f"incident {HIGH_SEV_INCIDENT_ID}",
+                )
+            assert row is not None, f"Incident {HIGH_SEV_INCIDENT_ID} not found"
+            assert row[0] == "monitoring", (
+                f"Incident {HIGH_SEV_INCIDENT_ID} has status='{row[0]}', "
+                f"expected 'monitoring'"
+            )
 
     elapsed = time.monotonic() - start
     progress.update_status(test_num, "✅", elapsed)
@@ -226,42 +391,70 @@ def test_4_inventory_error_creates_incident(results: ResultCollector, lock: thre
 
     msg = None
 
-    system_error_count_before = row_count(
-        "incidents", "type = %s", ("system_error",)
-    )
-
     try:
         msg = _run_scenario(
             sub_topic=TOPIC_INCIDENTS_CREATED,
             pub_topic=TOPIC_INVENTORY_ERRORS,
             pub_payload={
-                "error": "Database connection timeout",
+                # Marker embedded in the error string. The agent's
+                # inventory_error procedure stringifies the payload into
+                # the incident description, so this marker should land
+                # in the `description` column where we can find OUR row.
+                "error": f"Database connection timeout [{TEST4_ERROR_MARKER}]",
                 "component": "inventory_management_agent",
                 "timestamp": "2026-04-02T12:00:00Z",
             },
-            predicate=lambda msg: "system_error" in json.dumps(msg).lower(),
+            # Stricter predicate: require the agent to actually report a
+            # CREATE (not a no_action or error response that happens to
+            # mention 'system_error' in passing).
+            predicate=lambda msg: _is_created_with_marker(msg, TEST4_ERROR_MARKER),
             timeout_s=AGENT_TIMEOUT_S,
         )
     except Exception as exc:
         progress.update_status(test_num, "❌", time.monotonic() - start)
         with lock:
             results.record("t4_response_received", False, str(exc))
+        _diag(test_num, "scenario raised exception (no broker message)", None)
         return
 
     with lock:
         with results.test("t4_response_received", label="Message received on broker"):
+            if msg is None:
+                _diag(
+                    test_num,
+                    "broker check failed: no message matched predicate "
+                    "(expected action='created' with marker or system_error type)",
+                    msg,
+                )
             assert msg is not None
 
     time.sleep(POST_MSG_SLEEP_S)
 
     with lock:
         with results.test("t4_incident_created", label="New system_error incident created in database"):
-            system_error_count_after = row_count(
-                "incidents", "type = %s", ("system_error",)
+            row = _poll_for_row(
+                "SELECT incident_id, type, severity, description FROM incidents "
+                "WHERE type = 'system_error' "
+                "  AND description LIKE %s "
+                "ORDER BY created_date DESC LIMIT 1",
+                (f"%{TEST4_ERROR_MARKER}%",),
             )
-            assert system_error_count_after > system_error_count_before, (
-                f"No new system_error incident was created "
-                f"(before={system_error_count_before}, after={system_error_count_after})"
+            if row is None:
+                _diag(test_num, "DB check failed — broker message was:", msg)
+                _diag_db_snapshot(
+                    test_num,
+                    "SELECT incident_id, type, severity, description, created_date "
+                    "FROM incidents WHERE type = 'system_error' "
+                    "ORDER BY created_date DESC LIMIT 5",
+                    (),
+                    "5 most recent system_error incidents (regardless of marker)",
+                )
+            assert row is not None, (
+                f"No system_error incident found containing marker "
+                f"'{TEST4_ERROR_MARKER}' within {DB_POLL_DEADLINE_S}s."
+            )
+            assert row[2] == "high", (
+                f"system_error incident has severity='{row[2]}', expected 'high'"
             )
 
     elapsed = time.monotonic() - start
@@ -277,9 +470,6 @@ def test_5_shipment_delay_creates_incident(results: ResultCollector, lock: threa
 
     msg = None
 
-    # Capture count before — resilient to LLM-generated title format variations
-    shipment_delay_count_before = row_count("incidents", "type = %s", ("shipment_delay",))
-
     try:
         msg = _run_scenario(
             sub_topic=TOPIC_INCIDENTS_CREATED,
@@ -291,43 +481,55 @@ def test_5_shipment_delay_creates_incident(results: ResultCollector, lock: threa
                 "original_delivery_date": "2026-04-05",
                 "new_delivery_date": "2026-04-10",
                 "delay_reason": "Weather conditions affecting air transport",
+                "status": "Delayed",
+                "delay_hours": 120,
             },
-            predicate=lambda msg: TEST5_SHIPMENT_ID in json.dumps(msg),
+            predicate=lambda msg: (
+                TEST5_TRACKING_NUMBER in json.dumps(msg)
+                or "shipment_delay" in json.dumps(msg).lower()
+            ),
             timeout_s=AGENT_TIMEOUT_S,
         )
     except Exception as exc:
         progress.update_status(test_num, "❌", time.monotonic() - start)
         with lock:
             results.record("t5_response_received", False, str(exc))
+        _diag(test_num, "scenario raised exception (no broker message)", None)
         return
 
     with lock:
         with results.test("t5_response_received", label="Message received on broker"):
+            if msg is None:
+                _diag(test_num, "broker check failed: no message captured", msg)
             assert msg is not None
 
     time.sleep(POST_MSG_SLEEP_S)
 
     with lock:
         with results.test("t5_incident_severity", label="Shipment delay incident created with severity='medium'"):
-            # Count-based check — resilient to LLM-generated title format
-            # (agent may title the incident "Weather Delay" instead of including SHIP-XXXX literally)
-            shipment_delay_count_after = row_count("incidents", "type = %s", ("shipment_delay",))
-            assert shipment_delay_count_after > shipment_delay_count_before, (
-                f"No new shipment_delay incident was created for shipment {TEST5_SHIPMENT_ID}"
+            row = _poll_for_row(
+                "SELECT incident_id, severity FROM incidents "
+                "WHERE type = 'shipment_delay' "
+                "  AND description LIKE %s "
+                "ORDER BY created_date DESC LIMIT 1",
+                (f"%{TEST5_TRACKING_NUMBER}%",),
             )
-
-            # Verify the severity of the most recently created shipment_delay incident
-            conn = psycopg2.connect('postgresql://acme:acme@localhost:5432/orders')
-            cur = conn.cursor()
-            cur.execute(
-                "SELECT incident_id, severity FROM incidents WHERE type = %s ORDER BY created_date DESC LIMIT 1",
-                ("shipment_delay",)
+            if row is None or row[1] != "medium":
+                _diag(test_num, "DB/severity check failed — broker message was:", msg)
+                _diag_db_snapshot(
+                    test_num,
+                    "SELECT incident_id, type, severity, description, created_date "
+                    "FROM incidents WHERE type = 'shipment_delay' "
+                    "ORDER BY created_date DESC LIMIT 5",
+                    (),
+                    "5 most recent shipment_delay incidents (regardless of tracking_number)",
+                )
+            assert row is not None, (
+                f"No shipment_delay incident found containing tracking "
+                f"number '{TEST5_TRACKING_NUMBER}' within {DB_POLL_DEADLINE_S}s."
             )
-            row = cur.fetchone()
-            conn.close()
-
-            assert row is not None and row[1] == 'medium', (
-                f"Shipment delay incident has severity='{row[1] if row else None}', expected 'medium'"
+            assert row[1] == "medium", (
+                f"Shipment delay incident has severity='{row[1]}', expected 'medium'"
             )
 
     elapsed = time.monotonic() - start
@@ -341,7 +543,6 @@ def print_organized_summary(results: ResultCollector):
     W = 62
     thick = "═" * W
 
-    # Test metadata (in order)
     test_labels = {
         1: "Test 1 — Blocked order → inventory_shortage incident",
         2: "Test 2 — Validated order → no incident created",
@@ -350,7 +551,6 @@ def print_organized_summary(results: ResultCollector):
         5: "Test 5 — Shipment delay → shipment_delay incident",
     }
 
-    # Test name prefixes (how they're recorded)
     test_prefixes = {
         1: "t1_",
         2: "t2_",
@@ -359,17 +559,14 @@ def print_organized_summary(results: ResultCollector):
         5: "t5_",
     }
 
-    # Header
     print(_bold_cyan(thick))
     print(_bold(f"  Test Results  —  {results.suite_name}"))
     print(_bold_cyan(thick))
 
-    # Group results by test number
     for test_num in range(1, 6):
         print()
         print(_bold(f"  {test_labels[test_num]}"))
 
-        # Find all results for this test
         prefix = test_prefixes[test_num]
         test_results = [r for r in results._results if r.name.startswith(prefix)]
 
@@ -383,7 +580,6 @@ def print_organized_summary(results: ResultCollector):
                     for line in r.message.splitlines():
                         print(_red(f"         {line}"))
 
-    # Footer
     print()
     if results.all_passed:
         print(_bold_green(thick))
@@ -393,6 +589,9 @@ def print_organized_summary(results: ResultCollector):
         print(_bold_red(thick))
         print(_bold_red(f"  ✗   FAILED  —  {results.passed}/{results.total} checks passed ({results.failed} failed)"))
         print(_bold_red(thick))
+        print()
+        print(_dim("  Look for [diag tN] sections above (or in stderr) for"))
+        print(_dim("  the broker message and DB snapshot at the time of failure."))
 
 
 # ── Main Runner ────────────────────────────────────────────────────────────
@@ -413,7 +612,6 @@ def run_tests(student_email="student@example.com"):
         results.record("db_reset", passed=False, message=str(exc))
         return results
 
-    # Set up progress tracker
     test_info = [
         TestInfo(1, "test_1", "Blocked → shortage incident"),
         TestInfo(2, "test_2", "Validated → no incident"),
@@ -425,7 +623,6 @@ def run_tests(student_email="student@example.com"):
     progress = ProgressTable(test_info)
     progress.start()
 
-    # Run tests in parallel
     lock = threading.Lock()
     test_functions = [
         (test_1_blocked_order_creates_incident, results, lock, progress),
@@ -446,7 +643,6 @@ def run_tests(student_email="student@example.com"):
     print()
     print(_green(f"  ✅ All tests completed in {elapsed:.1f}s"))
 
-    # Print beautiful summary (organized by test number)
     print()
     print_organized_summary(results)
     return results

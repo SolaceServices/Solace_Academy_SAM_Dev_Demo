@@ -3,8 +3,8 @@
     {
       "order_id": "ORD-2026-001",
       "customer_id": "CUST-1001",
-      "customer_name": "Sarah Mitchell",
-      "customer_email": "sarah.mitchell@email.com",
+      "customer_name": "Michelle Mitchell",
+      "customer_email": "michelle.mitchell@email.com",
       "order_date": "2026-03-08T10:30:00Z",
       "status": "delivered",
       "priority": "standard",

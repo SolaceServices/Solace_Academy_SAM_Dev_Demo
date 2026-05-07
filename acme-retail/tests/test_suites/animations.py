@@ -334,7 +334,7 @@ def scene1(t):
         put(buffer, 1, box_x + box_w + 1, '|', B())
         put(buffer, 2, box_x, '+' + '-'*box_w + '+', B())
         orows = [
-            ('ORD-001', 'Sarah', t > 7),
+            ('ORD-001', 'Michelle', t > 7),
             ('ORD-002', 'James', t > 16),
             ('ORD-005', 'Lisa ', t > 24),
         ]

@@ -4,11 +4,11 @@
 
 In this course, you'll build **5 specialized agents** for the Acme Retail use case using **5 different creation methods**:
 
-1. **AcmeKnowledgeAgent** (RAG Agent) — Added from SAM plugin catalog
-2. **OrderFulfillmentAgent** — Created via CLI
-3. **InventoryManagementAgent** — Created via GUI with MCP tools
-4. **IncidentResponseAgent** — Created with AI assistant (Context7)
-5. **LogisticsAgent** — Integrated from an existing framework (external agent via A2A)
+1. **Acme Knowledge Agent** (RAG Agent) — Added from SAM plugin catalog
+2. **Order Fulfillment Agent** — Created via CLI
+3. **Inventory Management Agent** — Created via GUI with MCP tools
+4. **Incident Response Agent** — Created with AI assistant (Context7)
+5. **Logistics Agent** — Integrated from an existing framework (external agent via A2A)
 
 By the end of this course, you'll have a complete event-driven agent mesh that:
 - Answers questions about company policies (RAG)
@@ -360,7 +360,7 @@ cd /workspaces/Solace_Academy_SAM_Dev_Demo/300-Agents/sam
 source .venv/bin/activate
 ```
 ```
-sam add agent order_fulfillment_agent
+sam add agent order_fulfillment
 ```
 
 When prompted:
@@ -389,7 +389,7 @@ Inter-agent timeout (seconds) [600]: 60
 Tools configuration (JSON string of list) [[]]:
 ```
 
-This generates `configs/agents/order_fulfillment_agent_agent.yaml`.
+This generates `configs/agents/order_fulfillment_agent.yaml`.
 
 #### Step 2: Add Skills
 
@@ -944,7 +944,7 @@ Finally, update the output handlers:
           payload_format: "json"
 ```
 
-#### Step 7: Restart and Test Events
+#### Step 10: Restart and Test Events
 
 - Kill the running process (ctrl + c), `pkill -f "sam run"`, or click `Run Course Setup` > 300-Agents
 
@@ -986,7 +986,7 @@ Type `/connect`, select your provider, enter your API key.
 
 Type `/models` to select your model.
 
-Exit OpenCode and create `opencode.json` in the `300-Agents` directory:
+Exit OpenCode and create `opencode.json` in the `300-Agents/sam` directory:
 
 ```json
 {
@@ -1349,89 +1349,114 @@ WEB_UI_GATEWAY_DATABASE_URL="postgresql://acme:acme@localhost:5432/sam_gateway"
 
 #### Step 5: Create Event Gateway for LogisticsAgent
 
-Just like the other agents, LogisticsAgent needs an event gateway to react to real time logistics events.
+Just like the other agents, LogisticsAgent needs an entry point to react to real time logistics events.
 
 Create a new file here: `configs/gateways/acme-logistics-events.yaml`:
 
-Add the agent's content
+Add the file's content
 
 ```yaml
+log:
+  stdout_log_level: INFO
+  log_file_level: DEBUG
+  log_file: acme-logistics-events.log
+
 !include ../shared_config.yaml
 
-gateway_id: "logistics-gw-01"
-gateway_type: "event_mesh"
-
-event_mesh_broker_config:
-  broker_url: ${SOLACE_BROKER_URL}
-  broker_username: ${SOLACE_BROKER_USERNAME, admin}
-  broker_password: ${SOLACE_BROKER_PASSWORD, admin}
-  broker_vpn: ${SOLACE_BROKER_VPN, default}
-
-app:
-  event_handlers:
-    # Handle shipment creation events
-    - name: "shipment_created_handler"
+apps:
+  - name: acme-logistics-events-app
+    app_module: sam_event_mesh_gateway.app
+    broker:
+      <<: *broker_connection
+    app_config:
+      namespace: "${NAMESPACE}"
+      gateway_id: "logistics-gw-01"
+      artifact_service: *default_artifact_service
+      authorization_service:
+        type: "none"
       default_user_identity: "anonymous_event_mesh_user"
-      subscriptions:
-        - topic: "acme/logistics/shipment-created"
-          qos: 1
-      input_expression: >
-        template:New shipment created. Track this shipment and confirm it's in the system.
-        Shipment details: {{text://input.payload}}
-      payload_encoding: "utf-8"
-      payload_format: "json"
-      target_agent_name: "LogisticsAgent"
-      on_success: "logistics_updated_publisher"
-      on_error: "error_handler"
-    
-    # Handle status change events
-    - name: "status_changed_handler"
-      default_user_identity: "anonymous_event_mesh_user"
-      subscriptions:
-        - topic: "acme/logistics/status-changed"
-          qos: 1
-      input_expression: >
-        template:Update shipment status.
-        Tracking: {{text://input.payload:tracking_number}}
-        New status: {{text://input.payload:new_status}}
-        Location: {{text://input.payload:location}}
-      payload_encoding: "utf-8"
-      payload_format: "json"
-      target_agent_name: "LogisticsAgent"
-      on_success: "logistics_updated_publisher"
-      on_error: "error_handler"
-    
-    # Handle shipment delay events  
-    - name: "shipment_delayed_handler"
-      default_user_identity: "anonymous_event_mesh_user"
-      subscriptions:
-        - topic: "acme/logistics/shipment-delayed"
-          qos: 1
-      input_expression: >
-        template:Shipment delayed.
-        Tracking: {{text://input.payload:tracking_number}}
-        New ETA: {{text://input.payload:new_estimated_delivery}}
-        Reason: {{text://input.payload:reason}}
-      payload_encoding: "utf-8"
-      payload_format: "json"
-      target_agent_name: "LogisticsAgent"
-      on_success: "logistics_updated_publisher"
-      on_error: "error_handler"
 
-  output_handlers:
-    # Publish logistics update events
-    - name: "logistics_updated_publisher"
-      topic_expression: "static:acme/logistics/updated"
-      payload_expression: "task_response:text"
-      payload_encoding: "utf-8"
-      payload_format: "json"
-    
-    # Error handler
-    - name: "error_handler"
-      topic_expression: "static:acme/logistics/errors"
-      payload_expression: "task_response:text"
-      payload_encoding: "utf-8"
-      payload_format: "json"
+      event_mesh_broker_config:
+        broker_url: ${SOLACE_BROKER_URL}
+        broker_username: ${SOLACE_BROKER_USERNAME}
+        broker_password: ${SOLACE_BROKER_PASSWORD}
+        broker_vpn: ${SOLACE_BROKER_VPN}
+
+      event_handlers:
+
+        # ── 1. New shipment created ───────────────────────────────────
+        - name: "shipment_created_handler"
+          default_user_identity: "anonymous_event_mesh_user"
+          subscriptions:
+            - topic: "acme/logistics/shipment-created"
+              qos: 1
+          input_expression: >
+            template:EVENT_TYPE:shipment_created
+            PAYLOAD:{{text://input.payload}}
+          payload_encoding: "utf-8"
+          payload_format: "json"
+          target_agent_name: "LogisticsAgent"
+          on_success: "shipment_updated_handler"
+          on_error: "error_handler"
+          forward_context:
+            shipment_id: "input.payload:shipment_id"
+            order_id: "input.payload:order_id"
+
+        # ── 2. Shipment status changed ────────────────────────────────
+        - name: "status_changed_handler"
+          default_user_identity: "anonymous_event_mesh_user"
+          subscriptions:
+            - topic: "acme/logistics/status-changed"
+              qos: 1
+          input_expression: >
+            template:EVENT_TYPE:status_changed
+            PAYLOAD:{{text://input.payload}}
+          payload_encoding: "utf-8"
+          payload_format: "json"
+          target_agent_name: "LogisticsAgent"
+          on_success: "shipment_updated_handler"
+          on_error: "error_handler"
+          forward_context:
+            shipment_id: "input.payload:shipment_id"
+            tracking_number: "input.payload:tracking_number"
+
+        # ── 3. Shipment delayed ───────────────────────────────────────
+        - name: "shipment_delayed_handler"
+          default_user_identity: "anonymous_event_mesh_user"
+          subscriptions:
+            - topic: "acme/logistics/shipment-delayed"
+              qos: 1
+          input_expression: >
+            template:EVENT_TYPE:shipment_delayed
+            PAYLOAD:{{text://input.payload}}
+          payload_encoding: "utf-8"
+          payload_format: "json"
+          target_agent_name: "LogisticsAgent"
+          on_success: "shipment_delayed_event_handler"
+          on_error: "error_handler"
+          forward_context:
+            shipment_id: "input.payload:shipment_id"
+            order_id: "input.payload:order_id"
+
+      output_handlers:
+
+        # Publishes shipment update confirmations
+        - name: "shipment_updated_handler"
+          topic_expression: "static:acme/logistics/updated"
+          payload_format: "json"
+          payload_expression: "task_response:text"
+
+        # Publishes delay event confirmations
+        - name: "shipment_delayed_event_handler"
+          topic_expression: "static:acme/logistics/updated"
+          payload_format: "json"
+          payload_expression: "task_response:text"
+
+        # Error handler — publishes failures for observability
+        - name: "error_handler"
+          topic_expression: "static:acme/logistics/errors"
+          payload_format: "json"
+          payload_expression: "task_response:text"
 ```
 
 #### Step 6: Restart SAM and Verify Discovery

@@ -304,7 +304,7 @@ Let's create a project for this certification series:
 
 1. Click the **Projects** icon
 2. Click **"New Project"**
-3. Name it: `Solace Academt SAM Demo`
+3. Name it: `Solace Academy SAM Demo`
 4. Give it a description: `Acme Retail SAM Development`
 5. Add project-specific instructions:
 
@@ -344,10 +344,10 @@ Let's create a prompt that lists all available agents and tools:
 4. Give it a description: `List of all agents and tools available to the orchestrator`
 5. Tag: `No Tag`
 6. Chat Shortcut: `list-agents-tools`
-4. Add the prompt content:
+7. Add the prompt content:
 
 ```markdown
-Please provide a concise list of all agents and tools available to the orchestrator.
+Please provide a full list of all agents and tools available to the orchestrator.
 
 Create this as a downloadable markdown document artifact with the following format:
 
@@ -480,7 +480,7 @@ Event → triggers orchestrator
 - **The Orchestrator** is the system-level coordinator
 - **Dynamic routing** enables adaptive workflows based on runtime conditions
 - **Artifacts are shared state** that flows through the workflow
-- **Projects** group related work**
+- **Projects** group related work
 - **Prompts** enable reusable instructions
 - **Event-driven orchestration** is what makes SAM powerful in production environments
 - **The five orchestration patterns:** sequential, parallel, conditional, event-driven, human-in-the-loop 

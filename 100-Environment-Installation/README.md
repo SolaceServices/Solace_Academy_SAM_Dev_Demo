@@ -269,27 +269,6 @@ At this point, you have a **minimal SAM installation** with:
 - **PostgreSQL** (localhost:5432) — Stores session data, artifacts, chat history
 - **SQLite databases** — Per-agent session storage (e.g., `orchestrator.db`)
 
-## What Comes Out of the Box
-
-Even with a fresh install, SAM provides:
-
-### Projects
-Logical workspaces that group related chat sessions. Projects allow you to:
-- Maintain context across multiple conversations
-- Share artifacts between chats in the same project
-- Apply project-specific instructions
-
-### Prompts
-Globally reusable instructions that you can save and invoke with shortcuts. Instead of repeating instructions, save them as prompts for easy reuse.
-
-### Artifacts
-Structured outputs generated during workflows:
-- Generated text
-- Extracted data
-- Transformed documents
-- Results passed between agents
-
-The orchestrator uses artifacts as "shared state" — instead of passing raw text between agents, workflows exchange artifacts which can be validated, stored, or reused.
 
 ## Troubleshooting
 

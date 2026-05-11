@@ -2,7 +2,7 @@
 
 ## Overview
 
-This module teaches **multi-agent workflow orchestration** using Solace Agent Mesh (SAM). Students learn to coordinate multiple AI agents in parallel and sequential patterns to accomplish complex business processes that cannot be achieved with event-driven gateway pipelines alone.
+This module teaches **multi-agent workflow orchestration** using Solace Agent Mesh (SAM). Students learn to coordinate multiple AI agents in parallel and sequential patterns to accomplish complex business processes that cannot be achieved with event-driven entry point pipelines alone.
 
 **Course Focus:** Building automated workflows that combine data from multiple agents into executive reports, demonstrating real-world enterprise AI orchestration patterns.
 
@@ -10,13 +10,13 @@ This module teaches **multi-agent workflow orchestration** using Solace Agent Me
 
 ## Why Workflows?
 
-In Course 300, you built event-driven agent pipelines using gateways. Those pipelines are powerful, but they have real limitations:
+In Course 300, you built event-driven agent pipelines using entry points. Those pipelines are powerful, but they have real limitations:
 
-- **Gateways are stateless** — they fire, trigger an agent, and forget
-- **No scheduling** — gateways only respond to events, never to time
-- **No fan-out + merge** — a gateway routes to one agent; it can't query three agents in parallel and combine their results
-- **No pause/resume** — a gateway can't wait for a human decision mid-flow
-- **No retry/compensation** — if an agent fails, the gateway publishes to an error topic and stops
+- **Entry points are stateless** — they fire, trigger an agent, and forget
+- **No scheduling** — entry points only respond to events, never to time
+- **No fan-out + merge** — an entry point routes to one agent; it can't query three agents in parallel and combine their results
+- **No pause/resume** — an entry point can't wait for a human decision mid-flow
+- **No retry/compensation** — if an agent fails, the entry point publishes to an error topic and stops
 
 **Workflows fill exactly these gaps.**
 
@@ -24,7 +24,7 @@ In Course 300, you built event-driven agent pipelines using gateways. Those pipe
 
 > *Acme Retail's operations manager needs a daily executive summary covering inventory health, open incidents, and any orders stuck in 'blocked' status — automatically compiled and ready in the WebUI when she arrives each morning at 8 AM. No human should have to trigger it.*
 
-This is something the gateway-per-agent pattern from Course 300 **cannot do**. Workflows enable:
+This is something the entry-point-per-agent pattern from Course 300 **cannot do**. Workflows enable:
 - **Scheduled triggers** (cron-style time-based execution)
 - **Parallel fan-out** (query 3 agents simultaneously)
 - **Data aggregation** (merge multiple agent responses into one report)
@@ -46,7 +46,7 @@ The workflow takes ~30-40 seconds to complete. You'll see:
 By completing this module, students will understand:
 
 1. **Workflow Architecture:**
-   - How SAM workflows differ from gateway-driven event pipelines
+   - How SAM workflows differ from entry-point-driven event pipelines
    - When to use workflows vs. dynamic orchestration
    - Parallel vs. sequential execution patterns
    - Workflow state management and artifact persistence
@@ -83,12 +83,12 @@ By completing this module, students will understand:
 
 ### 1. Orchestrator as Proxy Pattern
 
-**Why:** Domain agents (InventoryManagementAgent, IncidentResponseAgent, OrderFulfillmentAgent) expect gateway-formatted events, not workflow inputs. They are not designed for direct workflow invocation.
+**Why:** Domain agents (InventoryManagementAgent, IncidentResponseAgent, OrderFulfillmentAgent) expect entry point-formatted events, not workflow inputs. They are not designed for direct workflow invocation.
 
 **Solution:** All workflow nodes call `OrchestratorAgent` with natural language instructions. The Orchestrator then calls domain agents via A2A (agent-to-agent communication).
 
 ```yaml
-# ❌ Direct call (fails - agent expects gateway event format)
+# ❌ Direct call (fails - agent expects entry point event format)
 - id: query_inventory
   agent_name: "InventoryManagementAgent"
 
@@ -482,7 +482,7 @@ curl http://127.0.0.1:8000/api/v1/artifacts/{session_id}
 After completing this module, you should have:
 
 1. ✅ A working Morning Briefing workflow that queries 3 agents in parallel
-2. ✅ Understanding of when to use workflows vs. gateways
+2. ✅ Understanding of when to use workflows vs. entry points
 3. ✅ Knowledge of how to schedule workflows via API
 4. ✅ Ability to troubleshoot workflow execution issues
 5. ✅ Experience with artifact management and template expressions

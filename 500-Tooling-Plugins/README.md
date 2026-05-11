@@ -42,7 +42,7 @@ bash 500-setup.sh /workspaces/Solace_Academy_SAM_Dev_Demo/500-Tooling-Plugins
 ✅ **Starts mock email service** on port 3000 (background process)  
 ✅ **Installs npm dependencies** for the email service (Express.js)  
 ✅ **Creates Python email tool wrapper** at \`/acme-retail/services/email_tool.py\`  
-✅ **Enables scheduler service** in WebUI gateway (for scheduled tasks)  
+✅ **Enables scheduler service** in WebUI entry point (for scheduled tasks)  
 ✅ Seeds test incident data
 
 **What you'll do manually (hands-on learning):**

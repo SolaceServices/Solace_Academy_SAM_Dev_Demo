@@ -318,7 +318,7 @@ OrderFulfillmentAgent-APAC (handles APAC orders)
 
 **Routing Logic**:
 ```python
-# Gateway determines partition
+# Entry point determines partition
 if order['region'] == 'US':
     target_agent = "OrderFulfillmentAgent-US"
 elif order['region'] == 'EU':
@@ -396,10 +396,10 @@ rate_limits:
   max_concurrent_requests: 10
 ```
 
-Gateway-level rate limiting:
+Entry point-level rate limiting:
 
 ```yaml
-# Gateway config
+# Entry point config
 rate_limit:
   requests_per_second: 100
   burst: 200
@@ -409,7 +409,7 @@ rate_limit:
 
 ### Infrastructure
 
-- [ ] Move from SQLite to PostgreSQL (all gateways)
+- [ ] Move from SQLite to PostgreSQL (all entry points)
 - [ ] Use managed Solace PubSub+ (not Docker)
 - [ ] Deploy Qdrant cluster (not single node)
 - [ ] Set up load balancers for Web UI

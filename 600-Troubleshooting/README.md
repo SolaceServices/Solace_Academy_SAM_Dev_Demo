@@ -41,7 +41,7 @@ Contains:
 - LLM API calls and responses
 - Tool executions
 - Error stack traces
-- Gateway activity
+- Entry point activity
 - A2A protocol messages
 
 ### Per-Agent Session Databases
@@ -70,9 +70,9 @@ External agents (like LogisticsAgent) have separate logs:
 cat 300-Agents/sam/logistics_agent.log
 ```
 
-### Gateway Logs
+### Entry Point Logs
 
-Event mesh gateway activity is in `sam.log`, search for:
+Event mesh entry point activity is in `sam.log`, search for:
 
 ```bash
 grep "gateway" sam.log
@@ -146,7 +146,7 @@ loggers:
     propagate: false
   
   sam.gateways:
-    level: INFO  # Gateway logging
+    level: INFO  # Entry point logging
     handlers: [file]
     propagate: false
 
@@ -190,7 +190,7 @@ grep "litellm" sam.log
 # Find tool executions
 grep "tool_name" sam.log
 
-# Find gateway events
+# Find entry point events
 grep "acme/orders/created" sam.log
 
 # Find exceptions
@@ -239,7 +239,7 @@ grep "agent_card" sam.log
 
 **Diagnosis**:
 ```bash
-# Check if gateway received event
+# Check if entry point received event
 grep "acme/orders/created" sam.log
 
 # Check if default_user_identity is present
@@ -249,7 +249,7 @@ grep "default_user_identity" configs/gateways/*.yaml
 **Solutions**:
 - Add `default_user_identity: "anonymous_event_mesh_user"` to EVERY event handler
 - Verify topic subscriptions match published topics exactly
-- Check gateway `target_agent_name` matches agent `agent_name`
+- Check entry point `target_agent_name` matches agent `agent_name`
 - Verify Solace broker is running: `docker ps | grep solace`
 
 ### Issue 3: Tool Execution Failures
@@ -363,7 +363,7 @@ for q in json.load(sys.stdin).get('data',[]):
 "
 ```
 
-### Issue 7: WebUI Gateway SQLite Lock Errors
+### Issue 7: WebUI Entry Point SQLite Lock Errors
 
 **Symptoms**:
 ```
@@ -382,7 +382,7 @@ WEB_UI_GATEWAY_DATABASE_URL=postgresql://acme:acme@localhost:5432/sam_gateway
 sam run
 ```
 
-The `webui.yaml` gateway config already supports this via environment variable.
+The `webui.yaml` entry point config already supports this via environment variable.
 
 ### Issue 8: External Agent Not Reachable
 
@@ -463,9 +463,9 @@ Use Solace PubSub+ Manager:
 4. Subscribe to topics: `acme/>`
 5. Publish test messages
 
-### Gateway Debug Mode
+### Entry Point Debug Mode
 
-Enable detailed gateway logging:
+Enable detailed entry point logging:
 
 ```yaml
 # configs/gateways/acme-order-events.yaml
@@ -474,7 +474,7 @@ logging:
   level: DEBUG  # Add this
 ```
 
-Restart SAM and check `sam.log` for detailed gateway activity.
+Restart SAM and check `sam.log` for detailed entry point activity.
 
 ## Performance Troubleshooting
 
@@ -506,7 +506,7 @@ du -sh *.db
 **Solutions**:
 - Delete old session DBs: `rm *.db`
 - Reduce conversation history retention
-- Use PostgreSQL for WebUI gateway
+- Use PostgreSQL for WebUI entry point
 - Restart SAM periodically
 
 ### Issue: Database Connection Pool Exhausted
@@ -528,7 +528,7 @@ psql -U acme -d orders -c "SELECT count(*) FROM pg_stat_activity WHERE datname =
 ### 1. Start Simple
 
 Isolate the problem:
-- Test agent directly (not through gateway)
+- Test agent directly (not through entry point)
 - Use minimal test data
 - Remove external dependencies temporarily
 
@@ -537,7 +537,7 @@ Isolate the problem:
 Follow this order:
 1. SAM startup logs (did all agents initialize?)
 2. Agent discovery logs (are agents registered?)
-3. Gateway logs (did event arrive?)
+3. Entry point logs (did event arrive?)
 4. Tool execution logs (did tool run?)
 5. Database logs (did query succeed?)
 
@@ -616,7 +616,7 @@ Restart SAM, reproduce issue, revert logging level.
 ### Debugging Workflow
 1. Reproduce the issue
 2. Check sam.log for errors
-3. Isolate the failing component (agent, tool, gateway)
+3. Isolate the failing component (agent, tool, entry point)
 4. Test component independently
 5. Fix and verify
 

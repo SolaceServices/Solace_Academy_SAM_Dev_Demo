@@ -23,7 +23,7 @@ By the end of this course, you'll have a complete event-driven agent mesh that:
 - How agents work in event-driven systems
 - The agent lifecycle (discovery, registration, execution)
 - Agent-to-Agent (A2A) protocol
-- Event mesh gateways and topic routing
+- Event mesh entry points and topic routing
 - Domain ownership patterns
 
 ### Technical Skills
@@ -33,7 +33,7 @@ By the end of this course, you'll have a complete event-driven agent mesh that:
 - Integrating external agents
 - Configuring SQL database tools
 - Using MCP (Model Context Protocol) servers
-- Creating event mesh gateways
+- Creating event mesh entry points
 - Publishing and subscribing to event topics
 
 ### Integration Patterns
@@ -152,7 +152,7 @@ When an agent starts:
 1. **Initialization**: Load configuration, connect to tools
 2. **Discovery**: Broadcast an "Agent Card" to the mesh
 3. **Registration**: Orchestrator adds agent to available capabilities
-4. **Subscription**: Gateway subscribes to topics on agent's behalf
+4. **Subscription**: Entry point subscribes to topics on agent's behalf
 5. **Ready**: Agent listens for A2A protocol messages
 
 ### The Agent Card
@@ -176,7 +176,7 @@ The **event mesh** is the communication backbone that connects all agents.
 - Supports dynamic topic routing
 - Provides guaranteed delivery and deduplication
 
-**Event Mesh Gateways**:
+**Event Mesh Entry Points**:
 - Subscribe to event topics
 - Call agents via A2A protocol when events arrive
 - Publish agent responses back to topics
@@ -516,9 +516,9 @@ In the Web UI, ask:
 
 The agent should query the database and return the order status.
 
-#### Step 6: Add Event Mesh Gateway
+#### Step 6: Add Event Mesh Entry Point
 
-Create the gateway that connects events to this agent:
+Create the entry point that connects events to this agent:
 
 ```bash
 sam plugin add acme-order-events --plugin sam-event-mesh-gateway
@@ -854,9 +854,9 @@ Ask the agent:
 
 The agent should query the inventory table and return the available_quantity.
 
-#### Step 9: Add Event Mesh Gateway
+#### Step 9: Add Event Mesh Entry Point
 
-Create the gateway that connects events to this agent:
+Create the entry point that connects events to this agent:
 
 ```bash
 sam plugin add acme-inventory-events --plugin sam-event-mesh-gateway
@@ -1107,7 +1107,7 @@ error     → {action,event_type,error}
 
 OpenCode will generate `configs/agents/incident_response_agent_agent.yaml`.
 
-#### Step 5: Create the Gateway
+#### Step 5: Create the Entry Point
 
 ```
 use context7 for solace-agent-mesh
@@ -1125,7 +1125,7 @@ INPUT TOPICS (subscribe + create event_handlers for each):
 - acme/logistics/errors   → forward_context error_source: "logistics" (a static string);        on_success: incident_created_handler
 
 DO NOT subscribe to acme/incidents/created — that is an OUTPUT topic
-this gateway publishes TO, not an input it consumes.
+this entry point publishes TO, not an input it consumes.
 
 OUTPUT TOPICS (create three output_handlers):
 - incident_created_handler   → static:acme/incidents/created   (for new incidents)
@@ -1347,7 +1347,7 @@ WEB_UI_GATEWAY_DATABASE_URL="postgresql://acme:acme@localhost:5432/sam_gateway"
 
 **That's all you need to let SAM discover and use the agent!**
 
-#### Step 5: Create Event Gateway for LogisticsAgent
+#### Step 5: Create Event Entry Point for LogisticsAgent
 
 Just like the other agents, LogisticsAgent needs an entry point to react to real time logistics events.
 
@@ -1570,7 +1570,7 @@ What is the status of shipment 1Z999AA10123456791?
 **Solutions**:
 - Verify `default_user_identity: "anonymous_event_mesh_user"` in EVERY event handler
 - Check topic subscriptions match published topics exactly
-- Verify gateway `target_agent_name` matches agent `agent_name`
+- Verify entry point `target_agent_name` matches agent `agent_name`
 - Check Solace broker is running: `docker ps | grep solace`
 
 ### Issue: MCP tools not working
@@ -1613,7 +1613,7 @@ What is the status of shipment 1Z999AA10123456791?
 - Verify tool_description is detailed
 - Use a flagship model (Claude 4.5, GPT-5, Gemini-3)
 
-### Issue: Gateway publishes to wrong topic
+### Issue: Entry Point publishes to wrong topic
 
 **Symptoms**: Events go to `acme/orders/decision` instead of `acme/incidents/created`
 
@@ -1626,13 +1626,13 @@ What is the status of shipment 1Z999AA10123456791?
 ## Key Takeaways
 
 ### Core Concepts
-- **Event-Driven Architecture**: Agents react to broker events via gateways, not direct API calls
+- **Event-Driven Architecture**: Agents react to broker events via entry points, not direct API calls
 - **Separation of Concerns**: Each agent has a single responsibility and owns one domain
 - **Decoupled Communication**: Producers and consumers operate independently through the event mesh
 
 
 ### Important Rules
-- Agent names must match exactly between YAML and gateway configs
+- Agent names must match exactly between YAML and entry point configs
 - Static topics only: `static:acme/topic/name`
 
 ### A2A Protocol

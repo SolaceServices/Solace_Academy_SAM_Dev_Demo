@@ -41,7 +41,7 @@ Acme Retail is launching a new AI initiative to improve operational awareness an
 
 The overall system will consist of:
 - **5 specialized agents**, each responsible for a specific domain
-- **Event gateways** that connect agents to real-time events
+- **Event entry points** that connect agents to real-time events
 - **An orchestrator** that routes requests and combines responses
 - **An event mesh** that enables real-time communication
 
@@ -259,8 +259,8 @@ At this point, you have a **minimal SAM installation** with:
 - Decides how to respond (directly or by delegating to other agents)
 - Manages workflow state via artifacts
 
-### 2. Web UI Gateway
-- HTTP/SSE gateway that connects the browser to SAM
+### 2. Web UI Entry Point
+- HTTP/SSE entry point that connects the browser to SAM
 - Handles user sessions and chat history
 - Streams responses back to the UI
 
@@ -295,7 +295,7 @@ At this point, you have a **minimal SAM installation** with:
 
 - **SAM makes AI agents event-driven participants** in your enterprise architecture
 - The **80/20 rule**: context and integration matter more than raw model capability
-- A **minimal SAM installation** includes an orchestrator, web UI gateway, and supporting infrastructure
+- A **minimal SAM installation** includes an orchestrator, web UI entry point, and supporting infrastructure
 
 ## Next Steps
 

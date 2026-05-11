@@ -491,5 +491,5 @@ In **Course 300: Creating AI Agents**, you'll:
 - Build 5 specialized agents for the Acme Retail use case
 - Learn 5 different methods for creating agents (catalog, CLI, GUI, Context7, 3rd party integration)
 - Integrate agents with tools (SQL databases, MCP servers, file systems)
-- Create event gateways that connect agents to real-time events
+- Create event entry points that connect agents to real-time events
 - Implement agent-to-agent communication (A2A protocol)

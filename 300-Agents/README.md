@@ -1051,70 +1051,58 @@ Run this prompt:
 ```
 use context7 for solace-agent-mesh.
 
-Read configs/agents/order_fulfillment.yaml; follow its conventions for all
-boilerplate (broker, log, session_service, artifact_service, artifact_handling,
-data_tools_config, auto_summarization, agent_card_publishing, agent_discovery,
-inter_agent_communication, !include shared_config.yaml).
-
-Create configs/agents/incident_response.yaml:
+Copy all boilerplate from configs/agents/order_fulfillment.yaml into
+configs/agents/incident_response.yaml. Then set:
 agent_name "IncidentResponse", app "IncidentResponse__app",
-display_name "Incident Response Agent", supports_streaming true.
-
-TOOLS (ordered): (1) SqlDatabaseTool tool_name "incidents_db",
-connection_string "postgresql://acme:acme@localhost:5432/orders" — handles
-INSERT/UPDATE on incidents/incident_items and SELECT on orders/order_items.
-(2) builtin create_chart_from_plotly_config. (3) builtin load_artifact.
-(4) builtin list_artifacts.
-
-session_service db_url "${INCIDENT_RESPONSE_AGENT_DATABASE_URL,sqlite:///incident_response.db}".
-
+display_name "Incident Response Agent", supports_streaming true,
+session_service db_url "${INCIDENT_RESPONSE_AGENT_DATABASE_URL,sqlite:///incident_response.db}",
 agent_card skills: create_incident, query_incidents, update_incident,
 resolve_incident, track_affected_items, generate_incident_reports.
 
-INSTRUCTIONS:
-Sole creator/manager of incidents. Input: EVENT_TYPE + PAYLOAD from gateway.
-Always return ONE JSON object — no prose, no markdown fences.
-Use INSERT/UPDATE with RETURNING; never wrap INSERT in a CTE.
-Never format timestamps in SQL — return raw Postgres values.
+TOOLS (ordered):
+1. SqlDatabaseTool name="incidents_db" conn="postgresql://acme:acme@localhost:5432/orders"
+2. builtin create_chart_from_plotly_config
+3. builtin load_artifact
+4. builtin list_artifacts
+
+RULES: Return ONE JSON object, no prose/fences. INSERT/UPDATE with RETURNING,
+no CTE wrapper. Never format timestamps in SQL. Severity hardcoded per event.
+Status on INSERT: high→investigating, else→open. Open={open,investigating};
+monitoring≠open.
+
+incident_id (do not deviate):
+'INC-'||to_char(NOW(),'YYYY')||'-'||LPAD(((SELECT COALESCE(MAX(
+SPLIT_PART(incident_id,'-',3)::int),0) FROM incidents WHERE incident_id
+LIKE 'INC-'||to_char(NOW(),'YYYY')||'-%')+1)::text,3,'0')
 
 Schema:
-incidents(incident_id, type, severity, status, title, description,
-created_date, last_updated, resolved_date, root_cause, supplier_id)
-incident_items(id, incident_id, item_id, product_name, quantity_short)
+incidents(incident_id,type,severity,status,title,description,
+          created_date,last_updated,resolved_date,root_cause,supplier_id)
+incident_items(id,incident_id,item_id,product_name,quantity_short)
 
-incident_id pattern (canonical — do not deviate):
-VALUES ('INC-'||to_char(NOW(),'YYYY')||'-'||LPAD(((SELECT
-COALESCE(MAX(SPLIT_PART(incident_id,'-',3)::int),0) FROM incidents
-WHERE incident_id LIKE 'INC-'||to_char(NOW(),'YYYY')||'-%')+1)::text,3,'0'), ...)
-RETURNING incident_id, type, severity, status, title, description,
-created_date, last_updated;
+EVENTS → ACTION:
+order_decision    | stock-blocked? no→no_action. yes→dedup via incident_items;
+                  | create type=inventory_shortage sev=high + incident_items
+                  | rows (quantity_short=ordered qty).
+logistics_updated | delay_hours=0 AND status≠delayed? →no_action. Else dedup
+                  | open shipment_delay by tracking_number in description;
+                  | create type=shipment_delay sev=medium (desc must contain
+                  | tracking_number).
+inventory_updated | new_stock_quantity=0→no_action. Else find open incidents
+                  | via incident_items.item_id; none→no_action; else UPDATE
+                  | status=monitoring, last_updated=NOW().
+*_error           | inventory_error/order_error/logistics_error all create
+                  | type=system_error sev=high, title: "{{Source}} System Error"
+description: "{{source}} system error: "
+ system error: "||payload::json.
 
-Severity is HARDCODED per event — never recompute from payload values.
-Status on INSERT: high→investigating, else→open.
-"Open" = status IN ('open','investigating'); 'monitoring' is NOT open.
+RETURNING clause: incident_id,type,severity,status,title,description,created_date,last_updated
 
-EVENT_TYPES:
-- order_decision: if no stock-blocked order → no_action. Else extract order_id,
-  JOIN orders+order_items, dedup via incident_items. If clear, create
-  type='inventory_shortage', severity='high'; one incident_items row per item
-  (quantity_short = ordered qty).
-- logistics_updated: if delay_hours=0 AND status≠'delayed' → no_action. Else
-  dedup open shipment_delay incidents by tracking_number in description. If
-  clear, create type='shipment_delay', severity='medium'. Description MUST
-  include tracking_number.
-- inventory_updated: extract item_id, new_stock_quantity. If qty=0 → no_action.
-  Find open incidents linked to item_id via incident_items; if none → no_action.
-  Else UPDATE status='monitoring', last_updated=NOW().
-- inventory_error: create type='system_error', severity='high',
-  title='Inventory System Error', description='Inventory system error: '||full payload as JSON.
-- order_error: same; title='Order System Error', prefix='Order system error: '.
-- logistics_error: same; title='Logistics System Error', prefix='Logistics system error: '.
-
-Response shapes:
-created:   {"action":"created","incident_id","type","severity","status","title","description","created_date"}
-updated:   {"action":"updated","incident_id","status","last_updated"}
-no_action: {"action":"no_action","event_type","reason"}
-error:     {"action":"error","event_type","error"}
+Responses:
+created   → {action,incident_id,type,severity,status,title,description,created_date}
+updated   → {action,incident_id,status,last_updated}
+no_action → {action,event_type,reason}
+error     → {action,event_type,error}
 ```
 
 OpenCode will generate `configs/agents/incident_response_agent_agent.yaml`.

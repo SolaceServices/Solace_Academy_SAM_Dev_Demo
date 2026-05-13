@@ -2,6 +2,7 @@ services:
   qdrant:
     image: qdrant/qdrant:latest
     container_name: 300-Agents-qdrant
+    restart: unless-stopped
     ports:
       - "6333:6333"
     volumes:
@@ -10,6 +11,7 @@ services:
   postgres:
     image: postgres:16
     container_name: 300-Agents-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: acme
       POSTGRES_PASSWORD: acme

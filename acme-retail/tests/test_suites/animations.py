@@ -800,7 +800,7 @@ def scene4(t, suites_done):
     - 35.0s: Scene ends
     """
     buffer = new_buf()
-    title = '[ ACME COMMAND CENTER  |  SAM v1.18.9 ]'
+    title = '[ ACME COMMAND CENTER  |  SAM v1.25.0 ]'
     put(buffer, 0, center_column(len(title)), title, W_())
     hline(buffer, 1, 0, canvas_width-1, '=', W_())
 

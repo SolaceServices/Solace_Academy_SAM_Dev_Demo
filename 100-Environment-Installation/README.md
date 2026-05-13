@@ -160,7 +160,7 @@ pip install -r requirements.txt
 
 This installs:
 - `solace-agent-mesh` (core framework)
-- Other required dependencies
+- Any other required dependencies
 
 ### Step 5: Initialize SAM
 
@@ -176,29 +176,33 @@ Answer: **y**
 
 The configuration portal will open in your browser. Choose **Advanced Setup** and configure:
 
-**Namespace & Broker**:
+**Project Structure**:
 - Project Namespace: `Solace-Academy-SAM-Demo`
+
+**Broker Setup**:
 - Broker Type: `Existing Solace PubSub+ broker`
 - Broker URL: `ws://localhost:8008`
 - VPN Name: `default`
 - Username: `admin`
 - Password: `admin`
 
-**LLM Configuration**:
-- LLM Provider: Your provider (e.g., "OpenAI Compatible Provider")
-- LLM Endpoint URL: Your endpoint (e.g., `https://api.openai.com/v1` or custom)
-- LLM API Key: Your API key
-- LLM Model Name: Your model (e.g., `claude-4-5-sonnet`, `gpt-5`)
+**Orchestrator**:
+Leave as is
 
-**Web UI Configuration**:
+**Web UI & Platform Service**:
 - Session Secret Key: Create a secure random key
+- FastAPI Host 0.0.0.0
+- Platform API Host: 0.0.0.0
 
-Click **"Initialize Project"** when ready, then close the browser tab.
+Click **Continue** then  **"Initialize Project"** when ready, then close the browser tab.
 
 ### Step 7: Save Configuration for Reuse
 
 To make things easier in the following courses, we've included some custom automation to avoid having to repeat this setup for each course:
 
+In your 100-Environment-Installation `.env` file, add this line: `PLATFORM_DATABASE_URL="postgresql://acme:acme@localhost:5432/sam_platform"`
+
+Then:
 1. Create a file called `.env.config` at the **root level** of the repository
 2. Copy all values from `100-Environment-Installation/sam/.env`
 3. Paste them into `.env.config`
@@ -211,7 +215,8 @@ After initialization completes, you should see this structure:
 
 ```
 100-Environment-Installation/sam/
-├── .env                           ← Your environment config
+├── .sam
+├── .venv
 ├── configs/
 │   ├── agents/
 │   │   └── main_orchestrator.yaml
@@ -219,14 +224,15 @@ After initialization completes, you should see this structure:
 │   │   └── webui.yaml
 │   ├── logging_config.yaml
 │   └── shared_config.yaml
-├── requirements.txt
 ├── src/
-├── sam.log
-└── .venv/
+├── .env                           ← Your environment config
+└── requirements.txt
 ```
 
 ### Step 9: Run SAM
+Lastly, in VScode well need to navigate to the ports tab and forward port 8000 and 8001 (if they arent't there already). 
 
+Then run:
 ```bash
 sam run
 ```
@@ -239,13 +245,24 @@ You should see output indicating SAM is starting up.
 2. Click the **web icon** next to port **8000**
 3. The SAM Web UI will open in your browser
 
+## Configuring your Models
+Once you see the SAM GUI, you should get a warning saying:
+```
+Default models have not been configured. Chat, agent creation, and other AI features require a General and Planning model to function. Go to Agent Mesh to configure your models. 
+```
+
+1. Navigate to the `Agent Mesh` > `Models` tab, click on the general model, click edit, and set your LLM API endpoint, API key, and select your model. 
+2. Test your connection.
+3. Click `save`
+
+Once you've set your general model, replicate these steps for the planning model. You can either choose the same model, or a different one. This makes it easy to swap models on the fly without having to reconfigura anything in the code
+
 ## Verifying Your Installation
 
 To confirm everything is working:
 
-1. Open the SAM Web UI
-2. Create a new chat
-3. Send a test prompt: *"What sort of things can you do?"* or *"In what use cases can Solace Agent Mesh be helpful?"*
+1. Create a new chat
+2. Send a test prompt: *"What sort of things can you do?"* or *"In what use cases can Solace Agent Mesh be helpful?"*
 
 If you receive a response, your installation was successful!
 

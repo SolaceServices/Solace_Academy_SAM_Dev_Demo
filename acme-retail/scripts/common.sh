@@ -38,7 +38,7 @@ build_ui_url() {
   if [ -n "${CODESPACE_NAME:-}" ] && [ -n "${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-}" ]; then
     echo "https://${CODESPACE_NAME}-${port}.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}/"
   else
-    echo "http://127.0.0.1:${port}/"
+    echo "http://localhost:${port}/"
   fi
 }
 
@@ -109,8 +109,10 @@ if [ -f "$SAM_ENV" ]; then
   set +a
 fi
 
-# For courses without infrastructure (no PostgreSQL), strip the PostgreSQL DB
-# URL from sam/.env so the WebUI gateway falls back to its SQLite default.
+# For courses without infrastructure (no PostgreSQL), strip the WebUI gateway
+# DB URL so it falls back to SQLite. PLATFORM_DATABASE_URL is left in place:
+# Postgres is always running via the devcontainer (configureEnv.sh) and the
+# shared sam_platform DB is meant to be accessible to every module.
 if [ -z "${INFRASTRUCTURE_DIR:-}" ] && [ -f "$SAM_ENV" ]; then
   sed -i '/^WEB_UI_GATEWAY_DATABASE_URL=/d' "$SAM_ENV"
   unset WEB_UI_GATEWAY_DATABASE_URL
@@ -214,6 +216,9 @@ if [ -n "${INFRASTRUCTURE_DIR:-}" ]; then
 
   # ── WEB_UI_GATEWAY_DATABASE_URL export ─────────────────────────────────
   export WEB_UI_GATEWAY_DATABASE_URL="postgresql://acme:acme@localhost:5432/sam_gateway"
+
+  # ── PLATFORM_DATABASE_URL export (shared platform DB across all modules) ─
+  export PLATFORM_DATABASE_URL="postgresql://acme:acme@localhost:5432/sam_platform"
 
   # ── /tmp/inventory-reports mkdir ───────────────────────────────────────
   mkdir -p /tmp/inventory-reports

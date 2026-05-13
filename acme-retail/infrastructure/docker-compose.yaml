@@ -1,7 +1,7 @@
 services:
   qdrant:
     image: qdrant/qdrant:latest
-    container_name: 300-Agents-qdrant
+    container_name: acme-qdrant
     restart: unless-stopped
     ports:
       - "6333:6333"
@@ -10,7 +10,7 @@ services:
 
   postgres:
     image: postgres:16
-    container_name: 300-Agents-postgres
+    container_name: acme-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: acme

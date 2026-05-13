@@ -85,13 +85,13 @@ Infrastructure services:
 
 ```bash
 # PostgreSQL logs
-docker logs 300-Agents-postgres
+docker logs acme-postgres
 
 # Solace broker logs
 docker logs solace
 
 # Qdrant logs
-docker logs 300-Agents-qdrant
+docker logs acme-qdrant
 ```
 
 ## Configuring Logging
@@ -549,7 +549,7 @@ Correlate events across logs using timestamps:
 # Find events around 10:23:45
 grep "2026-04-14 10:23:4" sam.log
 grep "2026-04-14 10:23:4" logistics_agent.log
-docker logs --since "2026-04-14T10:23:00" 300-Agents-postgres
+docker logs --since "2026-04-14T10:23:00" acme-postgres
 ```
 
 ### 4. Test Components Independently

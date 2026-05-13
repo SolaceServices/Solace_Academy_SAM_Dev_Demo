@@ -158,8 +158,8 @@ fi
 if [ -n "${INFRASTRUCTURE_DIR:-}" ]; then
 
   # ── docker stop/rm old containers + docker compose up ──────────────────
-  docker stop 300-Agents-qdrant 300-Agents-postgres >/dev/null 2>&1 || true
-  docker rm 300-Agents-qdrant 300-Agents-postgres >/dev/null 2>&1 || true
+  docker stop acme-qdrant acme-postgres >/dev/null 2>&1 || true
+  docker rm acme-qdrant acme-postgres >/dev/null 2>&1 || true
 
   echo "🔧 Setting up infrastructure..."
   if ! docker compose -f "$INFRASTRUCTURE_DIR/docker-compose.yaml" up -d; then
@@ -170,25 +170,25 @@ if [ -n "${INFRASTRUCTURE_DIR:-}" ]; then
   # ── Postgres health poll ────────────────────────────────────────────────
   POSTGRES_TIMEOUT=30
   for i in $(seq 1 $POSTGRES_TIMEOUT); do
-    if docker exec 300-Agents-postgres pg_isready -U acme -d orders >/dev/null 2>&1; then
+    if docker exec acme-postgres pg_isready -U acme -d orders >/dev/null 2>&1; then
       break
     fi
     if [ $i -eq $POSTGRES_TIMEOUT ]; then
       echo "❌ Error: PostgreSQL failed to start within ${POSTGRES_TIMEOUT}s"
-      echo "   Check: docker logs 300-Agents-postgres"
+      echo "   Check: docker logs acme-postgres"
       return 1
     fi
     sleep 1
   done
 
   # ── sam_gateway DB drop/recreate ────────────────────────────────────────
-  docker exec 300-Agents-postgres psql -U acme -d postgres \
+  docker exec acme-postgres psql -U acme -d postgres \
     -c "DROP DATABASE IF EXISTS sam_gateway" >/dev/null 2>&1 || true
-  docker exec 300-Agents-postgres psql -U acme -d postgres \
+  docker exec acme-postgres psql -U acme -d postgres \
     -c "CREATE DATABASE sam_gateway" >/dev/null 2>&1
 
   # ── DB seeding check ────────────────────────────────────────────────────
-  if ! docker exec 300-Agents-postgres psql -U acme -d orders -t \
+  if ! docker exec acme-postgres psql -U acme -d orders -t \
        -c "SELECT 1 FROM orders LIMIT 1;" 2>/dev/null | grep -q 1; then
     echo "🌱 Seeding database..."
     if ! python "$SCRIPTS_DIR/seed_orders_db.py"; then

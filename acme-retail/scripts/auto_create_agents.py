@@ -40,16 +40,6 @@ shared_config:
       broker_vpn: ${SOLACE_BROKER_VPN, default}
       temporary_queue: ${USE_TEMPORARY_QUEUES, true}
 
-  - models:
-    general: &general_model
-      # This dictionary structure tells ADK to use the LiteLlm wrapper.
-      # 'model' uses the specific model identifier your endpoint expects.
-      model: ${LLM_SERVICE_GENERAL_MODEL_NAME}
-      # 'api_base' tells LiteLLM where to send the request.
-      api_base: ${LLM_SERVICE_ENDPOINT}
-      # 'api_key' provides authentication.
-      api_key: ${LLM_SERVICE_API_KEY}
-
   - services:
     # Default session service configuration
     session_service: &default_session_service
@@ -70,10 +60,11 @@ apps:
     app_config:
       namespace: "${NAMESPACE}" # Your A2A topic namespace
       agent_name: "AcmeKnowledge" 
-      display_name: "Acme Knowledge Agent" 
+      display_name: "Acme Knowledge Agent"
       supports_streaming: true # RAG agent supports streaming responses
 
-      model: *general_model 
+      model_provider:
+        - "general"
       instruction: |
         You are Acme Knowledge, a RAG (Retrieval Augmented Generation) agent that can ingest documents and retrieve relevant information.
         You can search for information in the ingested documents and provide augmented responses.
@@ -269,7 +260,8 @@ apps:
       supports_streaming: true
       agent_name: "OrderFulfillmentAgent"
       display_name: "Order Fulfillment Agent Agent"
-      model: *general_model 
+      model_provider:
+        - "general"
 
       instruction: |
         You are an Order Fulfillment Agent responsible for processing customer orders,
@@ -431,7 +423,8 @@ apps:
       supports_streaming: true
       agent_name: "InventoryManagementAgent"
       display_name: "Inventory Management Agent"
-      model: *general_model
+      model_provider:
+        - "general"
 
       instruction: |
         You are an Inventory Management Agent responsible for monitoring Acme Retail's
@@ -588,7 +581,8 @@ apps:
       supports_streaming: true
       agent_name: "IncidentResponseAgent"
       display_name: "Incident Response Agent"
-      model: *general_model 
+      model_provider:
+        - "general"
 
       instruction: |
         You are the Incident Response Agent — the sole creator and manager of all incident
@@ -883,7 +877,8 @@ apps:
       namespace: ${NAMESPACE}
       session_secret_key: "${SESSION_SECRET_KEY}"
 
-      model: *general_model
+      model_provider:
+        - "general"
       artifact_service: *default_artifact_service
       session_service: 
         type: "sql"

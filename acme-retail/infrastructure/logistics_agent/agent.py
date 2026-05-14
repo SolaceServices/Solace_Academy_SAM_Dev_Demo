@@ -237,7 +237,11 @@ def detect_and_configure_model():
     
     # Fallback to OPENAI_* variables if LLM_SERVICE_* not set
     if not endpoint:
-        endpoint = os.getenv("OPENAI_API_BASE") or os.getenv("OPENAI_BASE_URL", "")
+        endpoint = (
+            os.getenv("OPENAI_API_BASE")
+            or os.getenv("OPENAI_BASE_URL")
+            or os.getenv("OPENAI_API_ENDPOINT", "")
+        )
     if not model_name:
         model_name = os.getenv("OPENAI_MODEL_NAME", "")
     if not api_key:
